@@ -1,0 +1,8 @@
+[build]
+  publish = "frontend"       # Папка с фронтендом
+  functions = "netlify/functions"  # Папка с serverless-функциями
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200

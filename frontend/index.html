@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Сглаживание изображений</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+        
+        body {
+            background-color: #1a0a0f;
+            color: #ffd6e7;
+            line-height: 1.6;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #2e0f1a;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 0 30px rgba(255, 105, 180, 0.2);
+            border: 1px solid #ff69b4;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #ff85c0;
+            margin-bottom: 25px;
+            text-shadow: 0 0 10px rgba(255, 105, 180, 0.5);
+        }
+        
+        .upload-box {
+            margin: 25px 0;
+        }
+        
+        .drop-area {
+            border: 2px dashed #ff69b4;
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background-color: rgba(255, 105, 180, 0.05);
+        }
+        
+        .drop-area.highlight {
+            border-color: #ff1493;
+            background-color: rgba(255, 20, 147, 0.1);
+            box-shadow: 0 0 15px rgba(255, 20, 147, 0.3);
+        }
+        
+        .drop-area p {
+            margin-bottom: 20px;
+            color: #ffb6c1;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #ff69b4, #ff1493);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 12px 6px;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(255, 105, 180, 0.3);
+        }
+        
+        .btn:hover {
+            background: linear-gradient(135deg, #ff1493, #ff69b4);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 105, 180, 0.4);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .options {
+            margin: 25px 0;
+            padding: 20px;
+            background-color: rgba(255, 105, 180, 0.08);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 105, 180, 0.2);
+        }
+        
+        .option-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #ff85c0;
+        }
+        
+        select {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #ff69b4;
+            background-color: #3a1424;
+            color: #ffd6e7;
+            font-size: 15px;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: #3a1424;
+            -webkit-appearance: none;
+            outline: none;
+            margin: 15px 0;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #ff69b4;
+            cursor: pointer;
+            box-shadow: 0 0 5px rgba(0,0,0,0.3);
+        }
+        
+        .preview-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 25px;
+            margin-top: 35px;
+        }
+        
+        .image-box {
+            flex: 1;
+            min-width: 300px;
+            background: rgba(255, 105, 180, 0.05);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 105, 180, 0.2);
+        }
+        
+        .image-box h3 {
+            color: #ff85c0;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .image-box img {
+            max-width: 100%;
+            max-height: 350px;
+            border-radius: 8px;
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        
+        .image-info {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #ffb6c1;
+            text-align: center;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .loading {
+            text-align: center;
+            margin: 30px 0;
+            color: #ff85c0;
+        }
+        
+        .progress-container {
+            width: 100%;
+            height: 6px;
+            background: #3a1424;
+            border-radius: 3px;
+            margin: 20px 0;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            width: 0;
+            border-radius: 3px;
+            background: linear-gradient(90deg, #ff69b4, #ff1493);
+            transition: width 0.3s ease-out;
+            box-shadow: 0 0 10px rgba(255, 105, 180, 0.5);
+        }
+
+        .loading-steps {
+            display: flex;
+            justify-content: space-between;
+            width: 80%;
+            margin: 10px auto;
+            color: #ff85c0;
+            font-size: 14px;
+        }
+
+        .loading-step {
+            opacity: 0.3;
+            transition: all 0.3s;
+        }
+
+        .loading-step.active {
+            opacity: 1;
+            color: #ff69b4;
+            font-weight: bold;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+        
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            color: #ff69b4;
+            font-size: 14px;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Розовое сглаживание изображений</h1>
+        
+        <div class="upload-box">
+            <div id="dropArea" class="drop-area">
+                <p>Перетащите сюда изображение или</p>
+                <button id="selectFiles" class="btn">Выбрать файл</button>
+                <p>Поддерживаются: JPG, PNG, WEBP (макс. 10MB)</p>
+            </div>
+            
+            <input type="file" id="fileInput" accept="image/*" style="display: none;">
+        </div>
+        
+        <div id="options" class="options hidden">
+            <div class="option-group">
+                <label for="scaleFactor">Увеличение:</label>
+                <select id="scaleFactor">
+                    <option value="2">2x</option>
+                    <option value="4" selected>4x</option>
+                    <option value="8">8x</option>
+                </select>
+            </div>
+            
+            <div class="option-group">
+                <label for="quality">Качество JPEG:</label>
+                <input type="range" id="quality" min="1" max="10" value="9">
+                <span id="qualityValue">9/10 (отличное)</span>
+            </div>
+            
+            <div class="option-group">
+                <label for="smoothStrength">Интенсивность сглаживания:</label>
+                <input type="range" id="smoothStrength" min="0" max="10" step="0.5" value="6">
+                <span id="smoothValue">6/10 (плавное)</span>
+            </div>
+            
+            <button id="processBtn" class="btn">Применить сглаживание</button>
+        </div>
+        
+        <div id="loading" class="loading hidden">
+            <p>Обработка изображения</p>
+            <div class="progress-container">
+                <div id="progressBar" class="progress-bar"></div>
+            </div>
+            <div class="loading-steps">
+                <div id="step1" class="loading-step">Загрузка</div>
+                <div id="step2" class="loading-step">Масштабирование</div>
+                <div id="step3" class="loading-step">Сглаживание</div>
+                <div id="step4" class="loading-step">Сохранение</div>
+            </div>
+        </div>
+        
+        <div id="preview" class="preview-container hidden">
+            <div class="image-box">
+                <h3>Оригинал</h3>
+                <img id="originalImage" src="" alt="Original">
+                <div id="originalInfo" class="image-info"></div>
+            </div>
+            <div class="image-box">
+                <h3>Результат</h3>
+                <img id="resultImage" src="" alt="Result">
+                <div id="resultInfo" class="image-info"></div>
+                <button id="downloadBtn" class="btn">Скачать результат</button>
+            </div>
+        </div>
+        
+        <footer>
+            <p>Инструмент для плавного сглаживания изображений</p>
+        </footer>
+    </div>
+
+    <script>
+        // Элементы DOM
+        const dropArea = document.getElementById('dropArea');
+        const fileInput = document.getElementById('fileInput');
+        const selectFilesBtn = document.getElementById('selectFiles');
+        const optionsDiv = document.getElementById('options');
+        const processBtn = document.getElementById('processBtn');
+        const loadingDiv = document.getElementById('loading');
+        const previewDiv = document.getElementById('preview');
+        const originalImage = document.getElementById('originalImage');
+        const resultImage = document.getElementById('resultImage');
+        const originalInfo = document.getElementById('originalInfo');
+        const resultInfo = document.getElementById('resultInfo');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const scaleFactor = document.getElementById('scaleFactor');
+        const qualitySlider = document.getElementById('quality');
+        const qualityValue = document.getElementById('qualityValue');
+        const smoothStrength = document.getElementById('smoothStrength');
+        const smoothValue = document.getElementById('smoothValue');
+        const progressBar = document.getElementById('progressBar');
+        
+        let selectedFile = null;
+        
+        // Инициализация
+        qualitySlider.addEventListener('input', updateQualityLabel);
+        smoothStrength.addEventListener('input', updateSmoothLabel);
+        updateQualityLabel();
+        updateSmoothLabel();
+        
+        function updateQualityLabel() {
+            const quality = qualitySlider.value;
+            let text = `${quality}/10 (`;
+            if (quality < 4) text += 'низкое';
+            else if (quality < 7) text += 'среднее';
+            else if (quality < 9) text += 'хорошее';
+            else text += 'отличное';
+            text += ')';
+            qualityValue.textContent = text;
+        }
+        
+        function updateSmoothLabel() {
+            const strength = smoothStrength.value;
+            let text = `${strength}/10 (`;
+            if (strength < 3) text += 'мягкое';
+            else if (strength < 6) text += 'плавное';
+            else if (strength < 8) text += 'сильное';
+            else text += 'ультра';
+            text += ')';
+            smoothValue.textContent = text;
+        }
+        
+        // Выбор файла
+        selectFilesBtn.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', handleFiles);
+        
+        // Drag and drop
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea.addEventListener(eventName, highlight, false);
+        });
+        
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, unhighlight, false);
+        });
+        
+        function highlight() {
+            dropArea.classList.add('highlight');
+        }
+        
+        function unhighlight() {
+            dropArea.classList.remove('highlight');
+        }
+        
+        dropArea.addEventListener('drop', function(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles({ target: { files } });
+        }, false);
+        
+        // Обработка файла
+        function handleFiles(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            if (!file.type.match('image.*')) {
+                alert('Пожалуйста, выберите изображение');
+                return;
+            }
+            
+            if (file.size > 10 * 1024 * 1024) {
+                alert('Файл слишком большой. Максимальный размер 10MB');
+                return;
+            }
+            
+            selectedFile = file;
+            optionsDiv.classList.remove('hidden');
+            
+            // Показ превью
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                originalImage.src = e.target.result;
+                
+                const img = new Image();
+                img.onload = function() {
+                    originalInfo.textContent = `${img.width} × ${img.height}px | ${formatSize(file.size)}`;
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        // Обработка изображения
+        processBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+            
+            loadingDiv.classList.remove('hidden');
+            optionsDiv.classList.add('hidden');
+            previewDiv.classList.add('hidden');
+            
+            // Сбрасываем прогресс
+            progressBar.style.width = '0%';
+            resetSteps();
+            
+            try {
+                // Этап 1: Загрузка изображения
+                updateStep('step1');
+                await updateProgress(10, 500);
+                
+                const img = await loadImage(selectedFile);
+                await updateProgress(20, 300);
+                
+                const scale = parseInt(scaleFactor.value);
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width * scale;
+                canvas.height = img.height * scale;
+                
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                
+                // Этап 2: Масштабирование
+                updateStep('step2');
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                await updateProgress(40, 800);
+                
+                // Этап 3: Сглаживание
+                const strength = parseFloat(smoothStrength.value);
+                if (strength > 0) {
+                    updateStep('step3');
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    
+                    // Полная обработка с прогрессом
+                    await applyFullSmoothing(imageData, strength, (progress) => {
+                        progressBar.style.width = `${40 + progress * 50}%`;
+                    });
+                    
+                    ctx.putImageData(imageData, 0, 0);
+                }
+                
+                // Этап 4: Сохранение
+                updateStep('step4');
+                await updateProgress(95, 500);
+                
+                // Итоговый результат
+                const quality = qualitySlider.value / 10;
+                resultImage.src = canvas.toDataURL('image/jpeg', quality);
+                await updateProgress(100, 300);
+                
+                // Показываем результат
+                loadingDiv.classList.add('hidden');
+                previewDiv.classList.remove('hidden');
+                resultInfo.textContent = `${canvas.width} × ${canvas.height}px | ${formatSize(selectedFile.size * scale * quality * 0.5)}`;
+                
+            } catch (error) {
+                console.error('Ошибка обработки:', error);
+                loadingDiv.classList.add('hidden');
+                alert('Произошла ошибка при обработке изображения');
+            }
+        });
+
+        // Загрузка изображения с Promise
+        function loadImage(file) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = reject;
+                img.src = URL.createObjectURL(file);
+            });
+        }
+
+        // Полное сглаживание без частичной обработки
+        async function applyFullSmoothing(imageData, strength, progressCallback) {
+            const data = imageData.data;
+            const width = imageData.width;
+            const height = imageData.height;
+            
+            const normalizedStrength = strength / 10;
+            const radius = Math.ceil(1 + normalizedStrength * 3);
+            const kernel = createGaussianKernel(radius);
+            
+            let buffer1 = new Uint8ClampedArray(data);
+            let buffer2 = new Uint8ClampedArray(data.length);
+            
+            // Применяем несколько проходов размытия
+            const passes = Math.ceil(1 + normalizedStrength * 2);
+            let progress = 0;
+            
+            for (let p = 0; p < passes; p++) {
+                // Горизонтальный проход
+                applyBlurPass(buffer1, buffer2, width, height, kernel, true);
+                
+                // Вертикальный проход
+                applyBlurPass(buffer2, buffer1, width, height, kernel, false);
+                
+                // Обновляем прогресс
+                progress = (p + 1) / passes;
+                progressCallback(progress * 0.8); // 80% на сглаживание
+                
+                // Добавляем небольшую задержку для анимации
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            
+            // Финальное смешивание
+            const blendFactor = 0.3 + normalizedStrength * 0.5;
+            for (let i = 0; i < data.length; i++) {
+                data[i] = Math.round(data[i] * (1 - blendFactor) + buffer1[i] * blendFactor);
+            }
+            
+            progressCallback(1);
+        }
+
+        // Полное применение размытия
+        function applyBlurPass(src, dst, width, height, kernel, horizontal) {
+            const radius = (kernel.length - 1) / 2;
+            
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    let r = 0, g = 0, b = 0, a = 0;
+                    let weightSum = 0;
+                    
+                    for (let k = -radius; k <= radius; k++) {
+                        let px = x, py = y;
+                        
+                        if (horizontal) {
+                            px = Math.min(width - 1, Math.max(0, x + k));
+                        } else {
+                            py = Math.min(height - 1, Math.max(0, y + k));
+                        }
+                        
+                        const idx = (py * width + px) * 4;
+                        const weight = kernel[k + radius];
+                        
+                        r += src[idx] * weight;
+                        g += src[idx + 1] * weight;
+                        b += src[idx + 2] * weight;
+                        weightSum += weight;
+                    }
+                    
+                    const idx = (y * width + x) * 4;
+                    dst[idx] = r / weightSum;
+                    dst[idx + 1] = g / weightSum;
+                    dst[idx + 2] = b / weightSum;
+                    dst[idx + 3] = src[idx + 3];
+                }
+            }
+        }
+
+        // Создание гауссова ядра
+        function createGaussianKernel(radius) {
+            const sigma = radius / 2;
+            const kernelSize = radius * 2 + 1;
+            const kernel = new Array(kernelSize);
+            let sum = 0;
+            
+            for (let i = 0; i < kernelSize; i++) {
+                const x = i - radius;
+                kernel[i] = Math.exp(-(x * x) / (2 * sigma * sigma));
+                sum += kernel[i];
+            }
+            
+            // Нормализация
+            for (let i = 0; i < kernelSize; i++) {
+                kernel[i] /= sum;
+            }
+            
+            return kernel;
+        }
+
+        // Обновление прогресс-бара
+        async function updateProgress(percent, duration) {
+            return new Promise(resolve => {
+                progressBar.style.width = percent + '%';
+                setTimeout(resolve, duration);
+            });
+        }
+
+        // Обновление активного шага
+        function updateStep(stepId) {
+            resetSteps();
+            const step = document.getElementById(stepId);
+            step.classList.add('active', 'pulse-animation');
+        }
+
+        // Сброс всех шагов
+        function resetSteps() {
+            document.querySelectorAll('.loading-step').forEach(step => {
+                step.classList.remove('active', 'pulse-animation');
+            });
+        }
+
+        // Скачивание
+        downloadBtn.addEventListener('click', () => {
+            if (!resultImage.src) return;
+            
+            const link = document.createElement('a');
+            link.href = resultImage.src;
+            link.download = `smooth_${selectedFile.name}`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+        
+        // Форматирование размера
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' Б';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' КБ';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' МБ';
+        }
+    </script>
+</body>
+</html>
+
+
