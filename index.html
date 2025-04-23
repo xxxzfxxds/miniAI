@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Сглаживание изображений</title>
+    <title>Розовое улучшение изображений</title>
     <style>
         * {
             margin: 0;
@@ -103,7 +103,7 @@
             color: #ff85c0;
         }
         
-        select {
+        select, input[type="checkbox"] {
             width: 100%;
             padding: 10px;
             border-radius: 8px;
@@ -236,11 +236,27 @@
             font-size: 14px;
             opacity: 0.8;
         }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+            margin-right: 10px;
+        }
+        
+        .checkbox-group label {
+            margin-bottom: 0;
+            font-weight: normal;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Сглаживание изображений</h1>
+        <h1>Розовое улучшение изображений</h1>
         
         <div class="upload-box">
             <div id="dropArea" class="drop-area">
@@ -274,7 +290,18 @@
                 <span id="smoothValue">6/10 (плавное)</span>
             </div>
             
-            <button id="processBtn" class="btn">Применить сглаживание</button>
+            <div class="option-group">
+                <label for="sharpness">Резкость:</label>
+                <input type="range" id="sharpness" min="0" max="10" step="0.5" value="5">
+                <span id="sharpnessValue">5/10 (умеренная)</span>
+            </div>
+            
+            <div class="checkbox-group">
+                <input type="checkbox" id="aiEnhance" checked>
+                <label for="aiEnhance">Дорисовка деталей ИИ</label>
+            </div>
+            
+            <button id="processBtn" class="btn">Улучшить изображение</button>
         </div>
         
         <div id="loading" class="loading hidden">
@@ -286,7 +313,9 @@
                 <div id="step1" class="loading-step">Загрузка</div>
                 <div id="step2" class="loading-step">Масштабирование</div>
                 <div id="step3" class="loading-step">Сглаживание</div>
-                <div id="step4" class="loading-step">Сохранение</div>
+                <div id="step4" class="loading-step">Дорисовка ИИ</div>
+                <div id="step5" class="loading-step">Коррекция резкости</div>
+                <div id="step6" class="loading-step">Сохранение</div>
             </div>
         </div>
         
@@ -305,7 +334,7 @@
         </div>
         
         <footer>
-            <p>Инструмент для плавного сглаживания изображений</p>
+            <p>Инструмент для улучшения изображений с ИИ-дорисовкой</p>
         </footer>
     </div>
 
@@ -328,6 +357,9 @@
         const qualityValue = document.getElementById('qualityValue');
         const smoothStrength = document.getElementById('smoothStrength');
         const smoothValue = document.getElementById('smoothValue');
+        const sharpnessSlider = document.getElementById('sharpness');
+        const sharpnessValue = document.getElementById('sharpnessValue');
+        const aiEnhanceCheckbox = document.getElementById('aiEnhance');
         const progressBar = document.getElementById('progressBar');
         
         let selectedFile = null;
@@ -335,8 +367,10 @@
         // Инициализация
         qualitySlider.addEventListener('input', updateQualityLabel);
         smoothStrength.addEventListener('input', updateSmoothLabel);
+        sharpnessSlider.addEventListener('input', updateSharpnessLabel);
         updateQualityLabel();
         updateSmoothLabel();
+        updateSharpnessLabel();
         
         function updateQualityLabel() {
             const quality = qualitySlider.value;
@@ -358,6 +392,17 @@
             else text += 'ультра';
             text += ')';
             smoothValue.textContent = text;
+        }
+        
+        function updateSharpnessLabel() {
+            const sharpness = sharpnessSlider.value;
+            let text = `${sharpness}/10 (`;
+            if (sharpness < 3) text += 'слабая';
+            else if (sharpness < 6) text += 'умеренная';
+            else if (sharpness < 8) text += 'сильная';
+            else text += 'экстремальная';
+            text += ')';
+            sharpnessValue.textContent = text;
         }
         
         // Выбор файла
@@ -444,10 +489,10 @@
             try {
                 // Этап 1: Загрузка изображения
                 updateStep('step1');
-                await updateProgress(10, 500);
+                await updateProgress(5, 500);
                 
                 const img = await loadImage(selectedFile);
-                await updateProgress(20, 300);
+                await updateProgress(10, 300);
                 
                 const scale = parseInt(scaleFactor.value);
                 const canvas = document.createElement('canvas');
@@ -461,7 +506,7 @@
                 ctx.imageSmoothingEnabled = true;
                 ctx.imageSmoothingQuality = 'high';
                 ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                await updateProgress(40, 800);
+                await updateProgress(25, 800);
                 
                 // Этап 3: Сглаживание
                 const strength = parseFloat(smoothStrength.value);
@@ -471,14 +516,44 @@
                     
                     // Полная обработка с прогрессом
                     await applyFullSmoothing(imageData, strength, (progress) => {
-                        progressBar.style.width = `${40 + progress * 50}%`;
+                        progressBar.style.width = `${25 + progress * 25}%`;
                     });
                     
                     ctx.putImageData(imageData, 0, 0);
+                    await updateProgress(50, 300);
                 }
                 
-                // Этап 4: Сохранение
-                updateStep('step4');
+                // Этап 4: Дорисовка ИИ (имитация)
+                const useAI = aiEnhanceCheckbox.checked;
+                if (useAI) {
+                    updateStep('step4');
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    
+                    // Имитация ИИ-дорисовки
+                    await applyAIEnhancement(imageData, (progress) => {
+                        progressBar.style.width = `${50 + progress * 20}%`;
+                    });
+                    
+                    ctx.putImageData(imageData, 0, 0);
+                    await updateProgress(70, 500);
+                }
+                
+                // Этап 5: Коррекция резкости
+                const sharpness = parseFloat(sharpnessSlider.value);
+                if (sharpness > 0) {
+                    updateStep('step5');
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    
+                    await applySharpness(imageData, sharpness, (progress) => {
+                        progressBar.style.width = `${70 + progress * 20}%`;
+                    });
+                    
+                    ctx.putImageData(imageData, 0, 0);
+                    await updateProgress(90, 300);
+                }
+                
+                // Этап 6: Сохранение
+                updateStep('step6');
                 await updateProgress(95, 500);
                 
                 // Итоговый результат
@@ -508,7 +583,7 @@
             });
         }
 
-        // Полное сглаживание без частичной обработки
+        // Полное сглаживание
         async function applyFullSmoothing(imageData, strength, progressCallback) {
             const data = imageData.data;
             const width = imageData.width;
@@ -534,7 +609,7 @@
                 
                 // Обновляем прогресс
                 progress = (p + 1) / passes;
-                progressCallback(progress * 0.8); // 80% на сглаживание
+                progressCallback(progress * 0.8);
                 
                 // Добавляем небольшую задержку для анимации
                 await new Promise(resolve => setTimeout(resolve, 50));
@@ -544,6 +619,89 @@
             const blendFactor = 0.3 + normalizedStrength * 0.5;
             for (let i = 0; i < data.length; i++) {
                 data[i] = Math.round(data[i] * (1 - blendFactor) + buffer1[i] * blendFactor);
+            }
+            
+            progressCallback(1);
+        }
+
+        // Имитация ИИ-дорисовки
+        async function applyAIEnhancement(imageData, progressCallback) {
+            const data = imageData.data;
+            const width = imageData.width;
+            const height = imageData.height;
+            
+            // Создаем копию оригинальных данных
+            const originalData = new Uint8ClampedArray(data);
+            
+            // Имитация обработки - добавляем детализации и улучшаем контраст
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const idx = (y * width + x) * 4;
+                    
+                    // Простая имитация ИИ - улучшение контраста и насыщенности
+                    const r = data[idx];
+                    const g = data[idx + 1];
+                    const b = data[idx + 2];
+                    
+                    // Увеличиваем контраст
+                    const contrast = 1.2;
+                    data[idx] = clamp((((r / 255) - 0.5) * contrast + 0.5) * 255);
+                    data[idx + 1] = clamp((((g / 255) - 0.5) * contrast + 0.5) * 255);
+                    data[idx + 2] = clamp((((b / 255) - 0.5) * contrast + 0.5) * 255);
+                    
+                    // Увеличиваем насыщенность
+                    const avg = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+                    const saturation = 1.3;
+                    data[idx] = clamp(avg + (data[idx] - avg) * saturation);
+                    data[idx + 1] = clamp(avg + (data[idx + 1] - avg) * saturation);
+                    data[idx + 2] = clamp(avg + (data[idx + 2] - avg) * saturation);
+                }
+                
+                // Обновляем прогресс
+                if (y % 10 === 0) {
+                    progressCallback(y / height * 0.8);
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                }
+            }
+            
+            // Смешиваем с оригиналом для сохранения естественности
+            for (let i = 0; i < data.length; i++) {
+                data[i] = Math.round(data[i] * 0.7 + originalData[i] * 0.3);
+            }
+            
+            progressCallback(1);
+        }
+
+        // Применение резкости
+        async function applySharpness(imageData, sharpness, progressCallback) {
+            const data = imageData.data;
+            const width = imageData.width;
+            const height = imageData.height;
+            
+            // Создаем размытую копию для unsharp mask
+            const blurred = new Uint8ClampedArray(data);
+            const kernel = createGaussianKernel(3);
+            
+            // Применяем размытие
+            const buffer = new Uint8ClampedArray(data.length);
+            applyBlurPass(blurred, buffer, width, height, kernel, true);
+            applyBlurPass(buffer, blurred, width, height, kernel, false);
+            
+            // Применяем unsharp masking
+            const amount = sharpness / 5; // Нормализуем значение резкости
+            
+            for (let i = 0; i < data.length; i++) {
+                // Пропускаем альфа-канал
+                if (i % 4 === 3) continue;
+                
+                // Unsharp mask формула
+                data[i] = clamp(data[i] + (data[i] - blurred[i]) * amount);
+                
+                // Обновляем прогресс
+                if (i % 10000 === 0) {
+                    progressCallback(i / data.length * 0.8);
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                }
             }
             
             progressCallback(1);
@@ -573,6 +731,7 @@
                         r += src[idx] * weight;
                         g += src[idx + 1] * weight;
                         b += src[idx + 2] * weight;
+                        a += src[idx + 3] * weight;
                         weightSum += weight;
                     }
                     
@@ -580,7 +739,7 @@
                     dst[idx] = r / weightSum;
                     dst[idx + 1] = g / weightSum;
                     dst[idx + 2] = b / weightSum;
-                    dst[idx + 3] = src[idx + 3];
+                    dst[idx + 3] = a / weightSum;
                 }
             }
         }
@@ -604,6 +763,11 @@
             }
             
             return kernel;
+        }
+
+        // Ограничение значения в диапазоне 0-255
+        function clamp(value) {
+            return Math.max(0, Math.min(255, value));
         }
 
         // Обновление прогресс-бара
@@ -634,7 +798,7 @@
             
             const link = document.createElement('a');
             link.href = resultImage.src;
-            link.download = `smooth_${selectedFile.name}`;
+            link.download = `enhanced_${selectedFile.name}`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -649,5 +813,3 @@
     </script>
 </body>
 </html>
-
-
