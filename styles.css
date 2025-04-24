@@ -6,7 +6,6 @@
 }
 
 body {
-    overflow: hidden;
     position: relative;
     background-color: #1a0a0f;
     color: #ffd6e7;
@@ -22,6 +21,7 @@ body {
 }
 
 .container {
+    min-height: 100vh;
     position: relative;
     z-index: 1;
     max-width: 800px;
