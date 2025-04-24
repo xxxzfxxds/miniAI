@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <canvas id="waterCanvas"></canvas>
+    <canvas id="backgroundCanvas"></canvas>
     <div class="container">
         <h1>Розовое улучшение изображений</h1>
         
@@ -19,7 +19,7 @@
             </div>
             <input type="file" id="fileInput" accept="image/*" style="display: none;">
         </div>
-        
+
         <div id="options" class="options hidden">
             <div class="option-group">
                 <label for="denoiseStrength">Первичная очистка шумов:</label>
@@ -67,7 +67,7 @@
             
             <button id="processBtn" class="btn">Улучшить изображение</button>
         </div>
-        
+
         <div id="loading" class="loading hidden">
             <p>Обработка изображения</p>
             <div class="progress-container">
@@ -84,7 +84,7 @@
                 <div id="step8" class="loading-step">Сохранение</div>
             </div>
         </div>
-        
+
         <div id="preview" class="preview-container hidden">
             <div class="image-box">
                 <h3>Оригинал</h3>
@@ -98,13 +98,13 @@
                 <button id="downloadBtn" class="btn">Скачать результат</button>
             </div>
         </div>
-        
+
         <footer>
             <p>Инструмент для улучшения изображений с двукратной очисткой шумов</p>
         </footer>
     </div>
 
-    <script src="water.js"></script>
+    <script src="ripple-effect.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
