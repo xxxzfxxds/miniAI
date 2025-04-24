@@ -281,15 +281,15 @@
         <div id="options" class="options hidden">
             <div class="option-group">
                 <label for="denoiseStrength">Интенсивность очистки шумов:</label>
-                <input type="range" id="denoiseStrength" min="0" max="10" step="0.5" value="8">
-                <span id="denoiseValue">8/10 (агрессивная)</span>
+                <input type="range" id="denoiseStrength" min="0" max="10" step="0.5" value="10">
+                <span id="denoiseValue">10/10 (максимальная)</span>
             </div>
             
-            <div class="advanced-options">
+            <div class="advanced-options hidden">
                 <div class="option-group">
                     <label for="denoiseMethod">Метод очистки:</label>
                     <select id="denoiseMethod">
-                        <option value="bilateral">Билатеральный фильтр (сохраняет края)</option>
+                        <option value="bilateral" selected>Билатеральный фильтр (сохраняет края)</option>
                         <option value="nonLocal">Нелокальное среднее (максимальное качество)</option>
                         <option value="wavelet">Вейвлет-преобразование (для сложных шумов)</option>
                     </select>
@@ -298,24 +298,19 @@
                 <div class="option-group">
                     <label for="noiseType">Тип шума:</label>
                     <select id="noiseType">
-                        <option value="gaussian">Гауссов шум (обычный)</option>
+                        <option value="gaussian" selected>Гауссов шум (обычный)</option>
                         <option value="saltPepper">Соль-перец (резкие точки)</option>
                         <option value="mixed">Смешанный шум</option>
                     </select>
-                </div>
-                
-                <div class="checkbox-group">
-                    <input type="checkbox" id="preserveDetails" checked>
-                    <label for="preserveDetails">Сохранять мелкие детали</label>
                 </div>
             </div>
             
             <div class="option-group">
                 <label for="scaleFactor">Увеличение:</label>
                 <select id="scaleFactor">
-                    <option value="1">Без увеличения</option>
+                    <option value="1" selected>Без увеличения</option>
                     <option value="2">2x</option>
-                    <option value="4" selected>4x</option>
+                    <option value="4">4x</option>
                 </select>
             </div>
             
@@ -329,11 +324,9 @@
             </div>
             <div class="loading-steps">
                 <div id="step1" class="loading-step">Загрузка</div>
-                <div id="step2" class="loading-step">Анализ шумов</div>
-                <div id="step3" class="loading-step">Очистка</div>
-                <div id="step4" class="loading-step">Восстановление</div>
-                <div id="step5" class="loading-step">Масштабирование</div>
-                <div id="step6" class="loading-step">Сохранение</div>
+                <div id="step2" class="loading-step">Очистка шумов</div>
+                <div id="step3" class="loading-step">Восстановление резкости</div>
+                <div id="step4" class="loading-step">Сохранение</div>
             </div>
         </div>
         
@@ -374,7 +367,6 @@
         const denoiseValue = document.getElementById('denoiseValue');
         const denoiseMethod = document.getElementById('denoiseMethod');
         const noiseType = document.getElementById('noiseType');
-        const preserveDetails = document.getElementById('preserveDetails');
         const scaleFactor = document.getElementById('scaleFactor');
         const progressBar = document.getElementById('progressBar');
         
@@ -390,7 +382,7 @@
             if (strength < 3) text += 'мягкая';
             else if (strength < 6) text += 'умеренная';
             else if (strength < 8) text += 'сильная';
-            else text += 'агрессивная';
+            else text += 'максимальная';
             text += ')';
             denoiseValue.textContent = text;
         }
@@ -479,10 +471,10 @@
             try {
                 // Этап 1: Загрузка изображения
                 updateStep('step1');
-                await updateProgress(5, 500);
+                await updateProgress(10, 500);
                 
                 const img = await loadImage(selectedFile);
-                await updateProgress(10, 300);
+                await updateProgress(20, 300);
                 
                 const canvas = document.createElement('canvas');
                 canvas.width = img.width;
@@ -490,37 +482,35 @@
                 const ctx = canvas.getContext('2d', { willReadFrequently: true });
                 ctx.drawImage(img, 0, 0);
                 
-                // Этап 2: Анализ шумов
+                // Этап 2: Очистка шумов
                 updateStep('step2');
                 const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const noiseLevel = analyzeNoise(imageData);
-                await updateProgress(20, 500);
-                
-                // Этап 3: Очистка шумов
-                updateStep('step3');
                 const denoiseStrengthValue = parseFloat(denoiseStrength.value);
-                const method = denoiseMethod.value;
-                const preserve = preserveDetails.checked;
                 
-                await applyAdvancedDenoise(imageData, denoiseStrengthValue, method, noiseLevel, preserve, (progress) => {
-                    progressBar.style.width = `${20 + progress * 40}%`;
-                });
+                await applyBilateralFilter(
+                    imageData.data, 
+                    canvas.width, 
+                    canvas.height, 
+                    denoiseStrengthValue / 10, 
+                    false, 
+                    (progress) => {
+                        progressBar.style.width = `${20 + progress * 50}%`;
+                    }
+                );
                 
                 ctx.putImageData(imageData, 0, 0);
-                await updateProgress(60, 300);
+                await updateProgress(70, 300);
                 
-                // Этап 4: Восстановление деталей
-                updateStep('step4');
-                if (preserve) {
-                    await restoreDetails(imageData, (progress) => {
-                        progressBar.style.width = `${60 + progress * 15}%`;
-                    });
-                    ctx.putImageData(imageData, 0, 0);
-                }
-                await updateProgress(75, 500);
+                // Этап 3: Восстановление резкости
+                updateStep('step3');
+                const sharpenedData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                await applySharpness(sharpenedData, 5, (progress) => {
+                    progressBar.style.width = `${70 + progress * 20}%`;
+                });
+                ctx.putImageData(sharpenedData, 0, 0);
+                await updateProgress(90, 500);
                 
-                // Этап 5: Масштабирование
-                updateStep('step5');
+                // Масштабирование (если нужно)
                 const scale = parseInt(scaleFactor.value);
                 if (scale > 1) {
                     canvas.width = img.width * scale;
@@ -529,10 +519,9 @@
                     ctx.imageSmoothingQuality = 'high';
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                 }
-                await updateProgress(90, 800);
                 
-                // Этап 6: Сохранение
-                updateStep('step6');
+                // Этап 4: Сохранение
+                updateStep('step4');
                 await updateProgress(95, 500);
                 
                 // Итоговый результат
@@ -542,7 +531,7 @@
                 // Показываем результат
                 loadingDiv.classList.add('hidden');
                 previewDiv.classList.remove('hidden');
-                resultInfo.textContent = `${canvas.width} × ${canvas.height}px | ${formatSize(selectedFile.size * scale * 0.5)}`;
+                resultInfo.textContent = `${canvas.width} × ${canvas.height}px | ${formatSize(selectedFile.size * (scale > 1 ? scale : 1) * 0.5)}`;
                 
             } catch (error) {
                 console.error('Ошибка обработки:', error);
@@ -559,78 +548,6 @@
                 img.onerror = reject;
                 img.src = URL.createObjectURL(file);
             });
-        }
-
-        // Анализ уровня шумов
-        function analyzeNoise(imageData) {
-            const data = imageData.data;
-            const width = imageData.width;
-            const height = imageData.height;
-            
-            // Простой анализ шумов на основе вариации яркости
-            let sum = 0;
-            let count = 0;
-            
-            for (let y = 1; y < height - 1; y++) {
-                for (let x = 1; x < width - 1; x++) {
-                    const idx = (y * width + x) * 4;
-                    const idxTop = ((y-1) * width + x) * 4;
-                    const idxBottom = ((y+1) * width + x) * 4;
-                    const idxLeft = (y * width + (x-1)) * 4;
-                    const idxRight = (y * width + (x+1)) * 4;
-                    
-                    // Яркость текущего пикселя
-                    const brightness = 0.299 * data[idx] + 0.587 * data[idx+1] + 0.114 * data[idx+2];
-                    
-                    // Яркость соседних пикселей
-                    const brightnessTop = 0.299 * data[idxTop] + 0.587 * data[idxTop+1] + 0.114 * data[idxTop+2];
-                    const brightnessBottom = 0.299 * data[idxBottom] + 0.587 * data[idxBottom+1] + 0.114 * data[idxBottom+2];
-                    const brightnessLeft = 0.299 * data[idxLeft] + 0.587 * data[idxLeft+1] + 0.114 * data[idxLeft+2];
-                    const brightnessRight = 0.299 * data[idxRight] + 0.587 * data[idxRight+1] + 0.114 * data[idxRight+2];
-                    
-                    // Разница с соседями
-                    const diffTop = Math.abs(brightness - brightnessTop);
-                    const diffBottom = Math.abs(brightness - brightnessBottom);
-                    const diffLeft = Math.abs(brightness - brightnessLeft);
-                    const diffRight = Math.abs(brightness - brightnessRight);
-                    
-                    // Средняя разница
-                    const avgDiff = (diffTop + diffBottom + diffLeft + diffRight) / 4;
-                    
-                    sum += avgDiff;
-                    count++;
-                }
-            }
-            
-            // Нормализация уровня шума (0-1)
-            const noiseLevel = Math.min(1, sum / count / 20);
-            return noiseLevel;
-        }
-
-        // Продвинутая очистка шумов
-        async function applyAdvancedDenoise(imageData, strength, method, noiseLevel, preserveDetails, progressCallback) {
-            const data = imageData.data;
-            const width = imageData.width;
-            const height = imageData.height;
-            
-            // Нормализация силы очистки с учетом уровня шума
-            const normalizedStrength = strength / 10 * (0.5 + noiseLevel * 0.5);
-            
-            switch (method) {
-                case 'bilateral':
-                    await applyBilateralFilter(data, width, height, normalizedStrength, preserveDetails, progressCallback);
-                    break;
-                    
-                case 'nonLocal':
-                    await applyNonLocalMeans(data, width, height, normalizedStrength, progressCallback);
-                    break;
-                    
-                case 'wavelet':
-                    await applyWaveletDenoising(data, width, height, normalizedStrength, progressCallback);
-                    break;
-            }
-            
-            progressCallback(1);
         }
 
         // Билатеральный фильтр (сохраняет края)
@@ -695,126 +612,13 @@
             }
         }
 
-        // Нелокальное среднее (более качественное, но медленное)
-        async function applyNonLocalMeans(data, width, height, strength, progressCallback) {
-            const searchRadius = Math.ceil(5 + strength * 3);
-            const patchRadius = 2;
-            const h = 10 * strength;
-            
-            const buffer = new Uint8ClampedArray(data.length);
-            
-            for (let y = 0; y < height; y++) {
-                for (let x = 0; x < width; x++) {
-                    const idx = (y * width + x) * 4;
-                    
-                    let r = 0, g = 0, b = 0, a = 0;
-                    let weightSum = 0;
-                    
-                    // Основное окно поиска
-                    for (let dy = -searchRadius; dy <= searchRadius; dy++) {
-                        for (let dx = -searchRadius; dx <= searchRadius; dx++) {
-                            const px = Math.min(width - 1, Math.max(0, x + dx));
-                            const py = Math.min(height - 1, Math.max(0, y + dy));
-                            const pIdx = (py * width + px) * 4;
-                            
-                            // Сравнение патчей
-                            let patchDist = 0;
-                            let patchCount = 0;
-                            
-                            for (let pdy = -patchRadius; pdy <= patchRadius; pdy++) {
-                                for (let pdx = -patchRadius; pdx <= patchRadius; pdx++) {
-                                    const currX = Math.min(width - 1, Math.max(0, x + pdx));
-                                    const currY = Math.min(height - 1, Math.max(0, y + pdy));
-                                    const currIdx = (currY * width + currX) * 4;
-                                    
-                                    const compX = Math.min(width - 1, Math.max(0, px + pdx));
-                                    const compY = Math.min(height - 1, Math.max(0, py + pdy));
-                                    const compIdx = (compY * width + compX) * 4;
-                                    
-                                    const dr = data[currIdx] - data[compIdx];
-                                    const dg = data[currIdx+1] - data[compIdx+1];
-                                    const db = data[currIdx+2] - data[compIdx+2];
-                                    
-                                    patchDist += dr * dr + dg * dg + db * db;
-                                    patchCount++;
-                                }
-                            }
-                            
-                            patchDist /= patchCount;
-                            const weight = Math.exp(-patchDist / (h * h));
-                            
-                            r += data[pIdx] * weight;
-                            g += data[pIdx+1] * weight;
-                            b += data[pIdx+2] * weight;
-                            a += data[pIdx+3] * weight;
-                            weightSum += weight;
-                        }
-                    }
-                    
-                    buffer[idx] = r / weightSum;
-                    buffer[idx+1] = g / weightSum;
-                    buffer[idx+2] = b / weightSum;
-                    buffer[idx+3] = a / weightSum;
-                }
-                
-                // Обновляем прогресс
-                if (y % 5 === 0) {
-                    progressCallback(y / height * 0.8);
-                    await new Promise(resolve => setTimeout(resolve, 0));
-                }
-            }
-            
-            // Копируем результат
-            for (let i = 0; i < data.length; i++) {
-                data[i] = buffer[i];
-            }
-        }
-
-        // Вейвлет-преобразование (для сложных шумов)
-        async function applyWaveletDenoising(data, width, height, strength, progressCallback) {
-            // Упрощенная имитация вейвлет-преобразования
-            // В реальности это требует сложных вычислений
-            
-            // Сначала применяем размытие по Гауссу
-            const radius = Math.ceil(2 + strength * 3);
-            const kernel = createGaussianKernel(radius);
-            
-            let buffer1 = new Uint8ClampedArray(data);
-            let buffer2 = new Uint8ClampedArray(data.length);
-            
-            // Горизонтальный проход
-            applyBlurPass(buffer1, buffer2, width, height, kernel, true);
-            
-            // Вертикальный проход
-            applyBlurPass(buffer2, buffer1, width, height, kernel, false);
-            
-            // Пороговая обработка (имитация вейвлет-фильтрации)
-            const threshold = 5 + strength * 20;
-            
-            for (let i = 0; i < data.length; i++) {
-                const diff = data[i] - buffer1[i];
-                if (Math.abs(diff) < threshold) {
-                    data[i] = buffer1[i];
-                } else {
-                    // Сохраняем резкие переходы (края)
-                    data[i] = data[i];
-                }
-                
-                // Обновляем прогресс
-                if (i % 10000 === 0) {
-                    progressCallback(i / data.length * 0.8);
-                    await new Promise(resolve => setTimeout(resolve, 0));
-                }
-            }
-        }
-
-        // Восстановление деталей
-        async function restoreDetails(imageData, progressCallback) {
+        // Применение резкости (unsharp mask)
+        async function applySharpness(imageData, sharpness, progressCallback) {
             const data = imageData.data;
             const width = imageData.width;
             const height = imageData.height;
             
-            // Создаем размытую версию
+            // Создаем размытую копию
             const blurred = new Uint8ClampedArray(data);
             const kernel = createGaussianKernel(3);
             const buffer = new Uint8ClampedArray(data.length);
@@ -822,13 +626,15 @@
             applyBlurPass(blurred, buffer, width, height, kernel, true);
             applyBlurPass(buffer, blurred, width, height, kernel, false);
             
-            // Усиливаем детали (unsharp mask с адаптивным коэффициентом)
+            // Применяем unsharp masking
+            const amount = sharpness / 5;
+            
             for (let i = 0; i < data.length; i++) {
-                if (i % 4 === 3) continue; // Пропускаем альфа-канал
+                // Пропускаем альфа-канал
+                if (i % 4 === 3) continue;
                 
-                const detail = data[i] - blurred[i];
-                const amount = 0.5 + (Math.abs(detail) / 50); // Адаптивный коэффициент
-                data[i] = clamp(data[i] + detail * amount);
+                // Unsharp mask формула
+                data[i] = clamp(data[i] + (data[i] - blurred[i]) * amount);
                 
                 // Обновляем прогресс
                 if (i % 10000 === 0) {
