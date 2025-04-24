@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Улучшение изображений</title>
+    <title>Розовое улучшение изображений</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <canvas id="backgroundCanvas"></canvas>
     <div class="container">
-        <h1>Улучшение изображений</h1>
+        <h1>Розовое улучшение изображений</h1>
         
         <div class="upload-box">
             <div id="dropArea" class="drop-area">
@@ -36,9 +36,11 @@
             <div class="option-group">
                 <label for="scaleFactor">Увеличение:</label>
                 <select id="scaleFactor">
+                    <option value="1">1x (оригинал)</option>
                     <option value="2">2x</option>
                     <option value="4" selected>4x</option>
                     <option value="8">8x</option>
+                    <option value="16">16x</option>
                 </select>
             </div>
             
