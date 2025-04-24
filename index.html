@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Профессиональная очистка изображений</title>
+    <title>Очистка изображений от шумов</title>
     <style>
         * {
             margin: 0;
@@ -92,47 +92,6 @@
             border: 1px solid rgba(255, 105, 180, 0.2);
         }
         
-        .option-group {
-            margin-bottom: 20px;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: bold;
-            color: #ff85c0;
-        }
-        
-        select, input[type="checkbox"] {
-            width: 100%;
-            padding: 10px;
-            border-radius: 8px;
-            border: 1px solid #ff69b4;
-            background-color: #3a1424;
-            color: #ffd6e7;
-            font-size: 15px;
-        }
-        
-        input[type="range"] {
-            width: 100%;
-            height: 8px;
-            border-radius: 4px;
-            background: #3a1424;
-            -webkit-appearance: none;
-            outline: none;
-            margin: 15px 0;
-        }
-        
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background: #ff69b4;
-            cursor: pointer;
-            box-shadow: 0 0 5px rgba(0,0,0,0.3);
-        }
-        
         .preview-container {
             display: flex;
             flex-wrap: wrap;
@@ -202,7 +161,7 @@
         .loading-steps {
             display: flex;
             justify-content: space-between;
-            width: 90%;
+            width: 80%;
             margin: 10px auto;
             color: #ff85c0;
             font-size: 14px;
@@ -211,8 +170,6 @@
         .loading-step {
             opacity: 0.3;
             transition: all 0.3s;
-            flex: 1;
-            text-align: center;
         }
 
         .loading-step.active {
@@ -238,35 +195,11 @@
             font-size: 14px;
             opacity: 0.8;
         }
-        
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-        
-        .checkbox-group input[type="checkbox"] {
-            width: auto;
-            margin-right: 10px;
-        }
-        
-        .checkbox-group label {
-            margin-bottom: 0;
-            font-weight: normal;
-        }
-        
-        .advanced-options {
-            margin-top: 20px;
-            padding: 15px;
-            background-color: rgba(255, 105, 180, 0.05);
-            border-radius: 8px;
-            border: 1px dashed rgba(255, 105, 180, 0.3);
-        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Профессиональная очистка изображений</h1>
+        <h1>Очистка изображений от шумов</h1>
         
         <div class="upload-box">
             <div id="dropArea" class="drop-area">
@@ -279,41 +212,9 @@
         </div>
         
         <div id="options" class="options hidden">
-            <div class="option-group">
-                <label for="denoiseStrength">Интенсивность очистки шумов:</label>
-                <input type="range" id="denoiseStrength" min="0" max="10" step="0.5" value="10">
-                <span id="denoiseValue">10/10 (максимальная)</span>
-            </div>
-            
-            <div class="advanced-options hidden">
-                <div class="option-group">
-                    <label for="denoiseMethod">Метод очистки:</label>
-                    <select id="denoiseMethod">
-                        <option value="bilateral" selected>Билатеральный фильтр (сохраняет края)</option>
-                        <option value="nonLocal">Нелокальное среднее (максимальное качество)</option>
-                        <option value="wavelet">Вейвлет-преобразование (для сложных шумов)</option>
-                    </select>
-                </div>
-                
-                <div class="option-group">
-                    <label for="noiseType">Тип шума:</label>
-                    <select id="noiseType">
-                        <option value="gaussian" selected>Гауссов шум (обычный)</option>
-                        <option value="saltPepper">Соль-перец (резкие точки)</option>
-                        <option value="mixed">Смешанный шум</option>
-                    </select>
-                </div>
-            </div>
-            
-            <div class="option-group">
-                <label for="scaleFactor">Увеличение:</label>
-                <select id="scaleFactor">
-                    <option value="1" selected>Без увеличения</option>
-                    <option value="2">2x</option>
-                    <option value="4">4x</option>
-                </select>
-            </div>
-            
+            <p style="text-align: center; margin-bottom: 20px; color: #ff85c0;">
+                Будет применена агрессивная очистка шумов с сохранением краёв
+            </p>
             <button id="processBtn" class="btn">Очистить изображение</button>
         </div>
         
@@ -324,9 +225,8 @@
             </div>
             <div class="loading-steps">
                 <div id="step1" class="loading-step">Загрузка</div>
-                <div id="step2" class="loading-step">Очистка шумов</div>
-                <div id="step3" class="loading-step">Восстановление резкости</div>
-                <div id="step4" class="loading-step">Сохранение</div>
+                <div id="step2" class="loading-step">Очистка</div>
+                <div id="step3" class="loading-step">Сохранение</div>
             </div>
         </div>
         
@@ -345,7 +245,7 @@
         </div>
         
         <footer>
-            <p>Профессиональный инструмент для очистки изображений от шумов</p>
+            <p>Инструмент для очистки изображений от шумов</p>
         </footer>
     </div>
 
@@ -363,29 +263,9 @@
         const originalInfo = document.getElementById('originalInfo');
         const resultInfo = document.getElementById('resultInfo');
         const downloadBtn = document.getElementById('downloadBtn');
-        const denoiseStrength = document.getElementById('denoiseStrength');
-        const denoiseValue = document.getElementById('denoiseValue');
-        const denoiseMethod = document.getElementById('denoiseMethod');
-        const noiseType = document.getElementById('noiseType');
-        const scaleFactor = document.getElementById('scaleFactor');
         const progressBar = document.getElementById('progressBar');
         
         let selectedFile = null;
-        
-        // Инициализация
-        denoiseStrength.addEventListener('input', updateDenoiseLabel);
-        updateDenoiseLabel();
-        
-        function updateDenoiseLabel() {
-            const strength = denoiseStrength.value;
-            let text = `${strength}/10 (`;
-            if (strength < 3) text += 'мягкая';
-            else if (strength < 6) text += 'умеренная';
-            else if (strength < 8) text += 'сильная';
-            else text += 'максимальная';
-            text += ')';
-            denoiseValue.textContent = text;
-        }
         
         // Выбор файла
         selectFilesBtn.addEventListener('click', () => fileInput.click());
@@ -485,43 +365,24 @@
                 // Этап 2: Очистка шумов
                 updateStep('step2');
                 const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const denoiseStrengthValue = parseFloat(denoiseStrength.value);
                 
+                // Применяем агрессивный билатеральный фильтр
                 await applyBilateralFilter(
                     imageData.data, 
                     canvas.width, 
                     canvas.height, 
-                    denoiseStrengthValue / 10, 
+                    1.0, // Максимальная интенсивность
                     false, 
                     (progress) => {
-                        progressBar.style.width = `${20 + progress * 50}%`;
+                        progressBar.style.width = `${20 + progress * 70}%`;
                     }
                 );
                 
                 ctx.putImageData(imageData, 0, 0);
-                await updateProgress(70, 300);
+                await updateProgress(90, 300);
                 
-                // Этап 3: Восстановление резкости
+                // Этап 3: Сохранение
                 updateStep('step3');
-                const sharpenedData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                await applySharpness(sharpenedData, 5, (progress) => {
-                    progressBar.style.width = `${70 + progress * 20}%`;
-                });
-                ctx.putImageData(sharpenedData, 0, 0);
-                await updateProgress(90, 500);
-                
-                // Масштабирование (если нужно)
-                const scale = parseInt(scaleFactor.value);
-                if (scale > 1) {
-                    canvas.width = img.width * scale;
-                    canvas.height = img.height * scale;
-                    ctx.imageSmoothingEnabled = true;
-                    ctx.imageSmoothingQuality = 'high';
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                }
-                
-                // Этап 4: Сохранение
-                updateStep('step4');
                 await updateProgress(95, 500);
                 
                 // Итоговый результат
@@ -531,7 +392,7 @@
                 // Показываем результат
                 loadingDiv.classList.add('hidden');
                 previewDiv.classList.remove('hidden');
-                resultInfo.textContent = `${canvas.width} × ${canvas.height}px | ${formatSize(selectedFile.size * (scale > 1 ? scale : 1) * 0.5)}`;
+                resultInfo.textContent = `${canvas.width} × ${canvas.height}px | ${formatSize(selectedFile.size * 0.5)}`;
                 
             } catch (error) {
                 console.error('Ошибка обработки:', error);
@@ -610,103 +471,6 @@
             for (let i = 0; i < data.length; i++) {
                 data[i] = buffer[i];
             }
-        }
-
-        // Применение резкости (unsharp mask)
-        async function applySharpness(imageData, sharpness, progressCallback) {
-            const data = imageData.data;
-            const width = imageData.width;
-            const height = imageData.height;
-            
-            // Создаем размытую копию
-            const blurred = new Uint8ClampedArray(data);
-            const kernel = createGaussianKernel(3);
-            const buffer = new Uint8ClampedArray(data.length);
-            
-            applyBlurPass(blurred, buffer, width, height, kernel, true);
-            applyBlurPass(buffer, blurred, width, height, kernel, false);
-            
-            // Применяем unsharp masking
-            const amount = sharpness / 5;
-            
-            for (let i = 0; i < data.length; i++) {
-                // Пропускаем альфа-канал
-                if (i % 4 === 3) continue;
-                
-                // Unsharp mask формула
-                data[i] = clamp(data[i] + (data[i] - blurred[i]) * amount);
-                
-                // Обновляем прогресс
-                if (i % 10000 === 0) {
-                    progressCallback(i / data.length * 0.8);
-                    await new Promise(resolve => setTimeout(resolve, 0));
-                }
-            }
-            
-            progressCallback(1);
-        }
-
-        // Применение размытия
-        function applyBlurPass(src, dst, width, height, kernel, horizontal) {
-            const radius = (kernel.length - 1) / 2;
-            
-            for (let y = 0; y < height; y++) {
-                for (let x = 0; x < width; x++) {
-                    let r = 0, g = 0, b = 0, a = 0;
-                    let weightSum = 0;
-                    
-                    for (let k = -radius; k <= radius; k++) {
-                        let px = x, py = y;
-                        
-                        if (horizontal) {
-                            px = Math.min(width - 1, Math.max(0, x + k));
-                        } else {
-                            py = Math.min(height - 1, Math.max(0, y + k));
-                        }
-                        
-                        const idx = (py * width + px) * 4;
-                        const weight = kernel[k + radius];
-                        
-                        r += src[idx] * weight;
-                        g += src[idx + 1] * weight;
-                        b += src[idx + 2] * weight;
-                        a += src[idx + 3] * weight;
-                        weightSum += weight;
-                    }
-                    
-                    const idx = (y * width + x) * 4;
-                    dst[idx] = r / weightSum;
-                    dst[idx + 1] = g / weightSum;
-                    dst[idx + 2] = b / weightSum;
-                    dst[idx + 3] = a / weightSum;
-                }
-            }
-        }
-
-        // Создание гауссова ядра
-        function createGaussianKernel(radius) {
-            const sigma = radius / 2;
-            const kernelSize = radius * 2 + 1;
-            const kernel = new Array(kernelSize);
-            let sum = 0;
-            
-            for (let i = 0; i < kernelSize; i++) {
-                const x = i - radius;
-                kernel[i] = Math.exp(-(x * x) / (2 * sigma * sigma));
-                sum += kernel[i];
-            }
-            
-            // Нормализация
-            for (let i = 0; i < kernelSize; i++) {
-                kernel[i] /= sum;
-            }
-            
-            return kernel;
-        }
-
-        // Ограничение значения в диапазоне 0-255
-        function clamp(value) {
-            return Math.max(0, Math.min(255, value));
         }
 
         // Обновление прогресс-бара
