@@ -28,7 +28,6 @@ class WaterEffect {
     }
     
     init() {
-        // Создаём сетку точек
         const cols = Math.floor(this.width / 30);
         const rows = Math.floor(this.height / 30);
         
@@ -66,14 +65,12 @@ class WaterEffect {
     
     update() {
         this.points.forEach(point => {
-            // Возвращаем точки к исходному положению с инерцией
             const dx = point.originalX - point.x;
             const dy = point.originalY - point.y;
             
             point.vx += dx * 0.02;
             point.vy += dy * 0.02;
             
-            // Замедление
             point.vx *= 0.9;
             point.vy *= 0.9;
             
@@ -86,7 +83,6 @@ class WaterEffect {
         this.ctx.clearRect(0, 0, this.width, this.height);
         this.ctx.fillStyle = '#ff69b4';
         
-        // Рисуем линии между точками
         this.ctx.beginPath();
         const cols = Math.floor(this.width / 30);
         
@@ -109,7 +105,6 @@ class WaterEffect {
         this.ctx.strokeStyle = 'rgba(255, 105, 180, 0.2)';
         this.ctx.stroke();
         
-        // Рисуем точки
         this.points.forEach(point => {
             this.ctx.beginPath();
             this.ctx.arc(point.x, point.y, 1, 0, Math.PI * 2);
@@ -124,7 +119,6 @@ class WaterEffect {
     }
 }
 
-// Инициализация при загрузке
 document.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('waterCanvas');
     new WaterEffect(canvas);
