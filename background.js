@@ -20,8 +20,8 @@ class RippleEffect {
 
     init() {
         // Создаем сетку точек
-        for (let y = 0; y < this.rows; y++) {
-            for (let x = 0; x < this.cols; x++) {
+        for (let y = -100; y < this.rows; y++) {
+            for (let x = -100; x < this.cols; x++) {
                 this.points.push({
                     x: x * this.gridSize,
                     y: y * this.gridSize,
