@@ -68,8 +68,8 @@ class RippleEffect {
                 const force = (200 - distance) / 200;
                 const angle = Math.atan2(dy, dx);
                 
-                point.vx = force * Math.cos(angle) * 5;
-                point.vy = force * Math.sin(angle) * 5;
+                point.vx = force * Math.cos(angle) * 5-;
+                point.vy = force * Math.sin(angle) * -5;
             }
             
             // Возвращение в исходное положение
