@@ -1,4 +1,3 @@
-// DOM элементы
 const dropArea = document.getElementById('dropArea');
 const fileInput = document.getElementById('fileInput');
 const selectFilesBtn = document.getElementById('selectFiles');
@@ -26,8 +25,8 @@ const aiEnhanceCheckbox = document.getElementById('aiEnhance');
 const progressBar = document.getElementById('progressBar');
 
 let selectedFile = null;
+let isProcessing = false;
 
-// Инициализация
 function init() {
     denoiseStrength.addEventListener('input', updateDenoiseLabel);
     finalDenoiseStrength.addEventListener('input', updateFinalDenoiseLabel);
@@ -62,7 +61,6 @@ function init() {
     downloadBtn.addEventListener('click', downloadResult);
 }
 
-// Обновление лейблов
 function updateDenoiseLabel() {
     updateLabel(denoiseStrength, denoiseValue, ['очень лёгкая', 'лёгкая', 'умеренная', 'сильная']);
 }
@@ -96,7 +94,6 @@ function updateLabel(slider, valueElement, labels) {
     valueElement.textContent = text;
 }
 
-// Обработка файлов
 function handleFiles(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -133,14 +130,13 @@ function handleDrop(e) {
     handleFiles({ target: { files } });
 }
 
-// Основная обработка изображения
 async function processImage() {
-    if (!selectedFile) return;
+    if (isProcessing || !selectedFile) return;
+    isProcessing = true;
     
     loadingDiv.classList.remove('hidden');
     optionsDiv.classList.add('hidden');
     previewDiv.classList.add('hidden');
-    
     progressBar.style.width = '0%';
     resetSteps();
     
@@ -234,10 +230,11 @@ async function processImage() {
         console.error('Ошибка обработки:', error);
         loadingDiv.classList.add('hidden');
         alert('Произошла ошибка при обработке изображения');
+    } finally {
+        isProcessing = false;
     }
 }
 
-// Алгоритмы обработки изображений
 async function applyBilateralFilter(imageData, strength, progressCallback) {
     const data = imageData.data;
     const width = imageData.width;
@@ -404,7 +401,6 @@ async function applySharpness(imageData, sharpness, progressCallback) {
     progressCallback(1);
 }
 
-// Вспомогательные функции
 function applyBlurPass(src, dst, width, height, kernel, horizontal) {
     const radius = (kernel.length - 1) / 2;
     
