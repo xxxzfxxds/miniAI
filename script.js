@@ -74,7 +74,7 @@ function updateQualityLabel() {
 }
 
 function updateSmoothLabel() {
-    updateLabel(smoothStrength, smoothValue, ['мягкое', 'плавное', 'сильное', 'ультра']);
+    updateLabel(smoothStrength, smoothValue, ['умное', 'адаптивное', 'сильное', 'ультра-плавное']);
 }
 
 function updateSharpnessLabel() {
@@ -309,28 +309,116 @@ async function applyFullSmoothing(imageData, strength, progressCallback) {
     const width = imageData.width;
     const height = imageData.height;
     
-    const normalizedStrength = strength / 10;
-    const radius = Math.ceil(1 + normalizedStrength * 3);
-    const kernel = createGaussianKernel(radius);
-    
-    let buffer1 = new Uint8ClampedArray(data);
-    let buffer2 = new Uint8ClampedArray(data.length);
-    
-    const passes = Math.ceil(1 + normalizedStrength * 2);
-    let progress = 0;
-    
-    for (let p = 0; p < passes; p++) {
-        applyBlurPass(buffer1, buffer2, width, height, kernel, true);
-        applyBlurPass(buffer2, buffer1, width, height, kernel, false);
-        
-        progress = (p + 1) / passes;
-        progressCallback(progress * 0.8);
-        await new Promise(resolve => setTimeout(resolve, 0));
+    if (strength < 0.5) {
+        progressCallback(1);
+        return;
     }
     
-    const blendFactor = 0.3 + normalizedStrength * 0.5;
-    for (let i = 0; i < data.length; i++) {
-        data[i] = Math.round(data[i] * (1 - blendFactor) + buffer1[i] * blendFactor);
+    // Адаптивные параметры на основе силы сглаживания
+    const radius = Math.ceil(1 + strength / 3);
+    const edgeThreshold = 30 - strength * 2; // Порог для определения границ
+    
+    const buffer1 = new Uint8ClampedArray(data);
+    const buffer2 = new Uint8ClampedArray(data.length);
+    
+    // 1. Анизотропное размытие с сохранением границ
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const idx = (y * width + x) * 4;
+            
+            // Детектор границ (упрощенный Sobel)
+            let gx = 0, gy = 0;
+            for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    const nx = Math.min(width-1, Math.max(0, x + dx));
+                    const ny = Math.min(height-1, Math.max(0, y + dy));
+                    const nIdx = (ny * width + nx) * 4;
+                    const gray = 0.3 * buffer1[nIdx] + 0.59 * buffer1[nIdx+1] + 0.11 * buffer1[nIdx+2];
+                    
+                    if (dx === -1) gx -= gray;
+                    if (dx === 1) gx += gray;
+                    if (dy === -1) gy -= gray;
+                    if (dy === 1) gy += gray;
+                }
+            }
+            const edgeStrength = Math.sqrt(gx*gx + gy*gy);
+            
+            // Адаптивное ядро размытия
+            if (edgeStrength > edgeThreshold) {
+                // На границе - минимальное размытие
+                for (let c = 0; c < 3; c++) {
+                    buffer2[idx + c] = buffer1[idx + c];
+                }
+            } else {
+                // В однородной области - сильное размытие
+                let sum = [0, 0, 0];
+                let count = 0;
+                
+                for (let dy = -radius; dy <= radius; dy++) {
+                    for (let dx = -radius; dx <= radius; dx++) {
+                        const nx = Math.min(width-1, Math.max(0, x + dx));
+                        const ny = Math.min(height-1, Math.max(0, y + dy));
+                        const nIdx = (ny * width + nx) * 4;
+                        
+                        for (let c = 0; c < 3; c++) {
+                            sum[c] += buffer1[nIdx + c];
+                        }
+                        count++;
+                    }
+                }
+                
+                for (let c = 0; c < 3; c++) {
+                    buffer2[idx + c] = sum[c] / count;
+                }
+            }
+            buffer2[idx + 3] = buffer1[idx + 3]; // Альфа-канал
+        }
+        
+        if (y % 10 === 0) {
+            progressCallback(y / height * 0.5);
+            await new Promise(resolve => setTimeout(resolve, 0));
+        }
+    }
+    
+    // 2. Билатеральная фильтрация для тонкой настройки
+    const sigmaColor = 10 + strength * 2;
+    for (let i = 0; i < data.length; i += 4) {
+        const x = (i / 4) % width;
+        const y = Math.floor((i / 4) / width);
+        
+        let sum = [0, 0, 0], totalWeight = 0;
+        const centerR = buffer2[i], centerG = buffer2[i+1], centerB = buffer2[i+2];
+        
+        for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+                const nx = Math.min(width-1, Math.max(0, x + dx));
+                const ny = Math.min(height-1, Math.max(0, y + dy));
+                const nIdx = (ny * width + nx) * 4;
+                
+                const colorDist = Math.sqrt(
+                    Math.pow(buffer2[nIdx] - centerR, 2) +
+                    Math.pow(buffer2[nIdx+1] - centerG, 2) +
+                    Math.pow(buffer2[nIdx+2] - centerB, 2)
+                );
+                
+                const weight = Math.exp(-colorDist / (2 * sigmaColor * sigmaColor));
+                
+                for (let c = 0; c < 3; c++) {
+                    sum[c] += buffer2[nIdx + c] * weight;
+                }
+                totalWeight += weight;
+            }
+        }
+        
+        for (let c = 0; c < 3; c++) {
+            data[i + c] = sum[c] / totalWeight;
+        }
+        data[i + 3] = buffer2[i + 3];
+        
+        if (i % 4000 === 0) {
+            progressCallback(0.5 + (i / data.length) * 0.5);
+            await new Promise(resolve => setTimeout(resolve, 0));
+        }
     }
     
     progressCallback(1);
