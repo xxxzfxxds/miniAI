@@ -511,4 +511,176 @@ async function applyBasicEnhancement(imageData, progressCallback) {
             const g = data[idx + 1];
             const b = data[idx + 2];
             
-            const contrast = 
+            const contrast = 1.2;
+            data[idx] = clamp((((r / 255) - 0.5) * contrast + 0.5) * 255);
+            data[idx + 1] = clamp((((g / 255) - 0.5) * contrast + 0.5) * 255);
+            data[idx + 2] = clamp((((b / 255) - 0.5) * contrast + 0.5) * 255);
+            
+            const avg = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+            const saturation = 1.3;
+            data[idx] = clamp(avg + (data[idx] - avg) * saturation);
+            data[idx + 1] = clamp(avg + (data[idx + 1] - avg) * saturation);
+            data[idx + 2] = clamp(avg + (data[idx + 2] - avg) * saturation);
+        }
+        
+        if (y % 10 === 0) {
+            progressCallback(y / height * 0.8);
+            await new Promise(resolve => setTimeout(resolve, 0));
+        }
+    }
+    
+    for (let i = 0; i < data.length; i++) {
+        data[i] = Math.round(data[i] * 0.7 + originalData[i] * 0.3);
+    }
+    
+    progressCallback(1);
+}
+
+// Увеличение резкости
+async function applySharpness(imageData, sharpness, progressCallback) {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+    
+    const blurred = new Uint8ClampedArray(data);
+    const kernel = createGaussianKernel(3);
+    
+    const buffer = new Uint8ClampedArray(data.length);
+    applyBlurPass(blurred, buffer, width, height, kernel, true);
+    applyBlurPass(buffer, blurred, width, height, kernel, false);
+    
+    const amount = sharpness / 5;
+    
+    for (let i = 0; i < data.length; i++) {
+        if (i % 4 === 3) continue;
+        data[i] = clamp(data[i] + (data[i] - blurred[i]) * amount);
+        
+        if (i % 10000 === 0) {
+            progressCallback(i / data.length * 0.8);
+            await new Promise(resolve => setTimeout(resolve, 0));
+        }
+    }
+    
+    progressCallback(1);
+}
+
+// Вспомогательные функции
+function applyBlurPass(src, dst, width, height, kernel, horizontal) {
+    const radius = (kernel.length - 1) / 2;
+    
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            let r = 0, g = 0, b = 0, a = 0;
+            let weightSum = 0;
+            
+            for (let k = -radius; k <= radius; k++) {
+                let px = x, py = y;
+                
+                if (horizontal) {
+                    px = Math.min(width - 1, Math.max(0, x + k));
+                } else {
+                    py = Math.min(height - 1, Math.max(0, y + k));
+                }
+                
+                const idx = (py * width + px) * 4;
+                const weight = kernel[k + radius];
+                
+                r += src[idx] * weight;
+                g += src[idx + 1] * weight;
+                b += src[idx + 2] * weight;
+                a += src[idx + 3] * weight;
+                weightSum += weight;
+            }
+            
+            const idx = (y * width + x) * 4;
+            dst[idx] = r / weightSum;
+            dst[idx + 1] = g / weightSum;
+            dst[idx + 2] = b / weightSum;
+            dst[idx + 3] = a / weightSum;
+        }
+    }
+}
+
+function createGaussianKernel(radius) {
+    const sigma = radius / 2;
+    const kernelSize = radius * 2 + 1;
+    const kernel = new Array(kernelSize);
+    let sum = 0;
+    
+    for (let i = 0; i < kernelSize; i++) {
+        const x = i - radius;
+        kernel[i] = Math.exp(-(x * x) / (2 * sigma * sigma));
+        sum += kernel[i];
+    }
+    
+    for (let i = 0; i < kernelSize; i++) {
+        kernel[i] /= sum;
+    }
+    
+    return kernel;
+}
+
+function clamp(value) {
+    return Math.max(0, Math.min(255, value));
+}
+
+function loadImage(file) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = URL.createObjectURL(file);
+    });
+}
+
+function preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
+}
+
+function highlight() {
+    elements.dropArea.classList.add('highlight');
+}
+
+function unhighlight() {
+    elements.dropArea.classList.remove('highlight');
+}
+
+async function updateProgress(percent, duration) {
+    return new Promise(resolve => {
+        elements.progressBar.style.width = percent + '%';
+        setTimeout(resolve, duration);
+    });
+}
+
+function updateStep(stepId) {
+    resetSteps();
+    const step = document.getElementById(stepId);
+    step.classList.add('active', 'pulse-animation');
+}
+
+function resetSteps() {
+    document.querySelectorAll('.loading-step').forEach(step => {
+        step.classList.remove('active', 'pulse-animation');
+    });
+}
+
+function downloadResult() {
+    if (!elements.resultImage.src) return;
+    
+    const link = document.createElement('a');
+    link.href = elements.resultImage.src;
+    link.download = `enhanced_${selectedFile.name}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' Б';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' КБ';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' МБ';
+}
+
+// Инициализация при загрузке страницы
+document.addEventListener('DOMContentLoaded', init);
