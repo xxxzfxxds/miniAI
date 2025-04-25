@@ -33,7 +33,6 @@ body {
     border: 1px solid #ff69b4;
 }
 
-
 h1 {
     text-align: center;
     color: #ff85c0;
@@ -200,7 +199,7 @@ input[type="range"]::-webkit-slider-thumb {
     width: 0;
     border-radius: 3px;
     background: linear-gradient(90deg, #ff69b4, #ff1493);
-    transition: width 0.3s ease-out;
+    transition: width 0.5s cubic-bezier(0.65, 0, 0.35, 1);
     box-shadow: 0 0 10px rgba(255, 105, 180, 0.5);
 }
 
@@ -258,4 +257,22 @@ footer {
 .checkbox-group label {
     margin-bottom: 0;
     font-weight: normal;
+}
+
+.model-status {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: rgba(255, 105, 180, 0.9);
+    padding: 10px 15px;
+    border-radius: 8px;
+    font-size: 14px;
+    color: white;
+    z-index: 100;
+    transition: opacity 0.3s;
+}
+
+.model-status.hidden {
+    opacity: 0;
+    pointer-events: none;
 }
