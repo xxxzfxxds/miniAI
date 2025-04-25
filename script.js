@@ -1,6 +1,4 @@
 // Глобальные переменные
-let aiModel = null;
-let isModelLoading = false;
 let selectedFile = null;
 let isProcessing = false;
 
@@ -39,7 +37,6 @@ const elements = {
 function init() {
     setupEventListeners();
     updateAllLabels();
-    loadAIModel();
 }
 
 // Настройка обработчиков событий
@@ -92,30 +89,6 @@ function updateLabel(slider, valueElement, labels) {
     
     text += ')';
     valueElement.textContent = text;
-}
-
-// Загрузка ИИ модели
-async function loadAIModel() {
-    if (isModelLoading) return;
-    isModelLoading = true;
-    
-    elements.modelStatus.classList.remove('hidden');
-    elements.modelStatusText.textContent = 'Загрузка ИИ модели...';
-    
-    try {
-        aiModel = await ort.InferenceSession.create(
-            'https://your-model-host.com/models/real_esrgan.onnx',
-            { executionProviders: ['webgl'] }
-        );
-        elements.modelStatusText.textContent = 'ИИ модель готова';
-        setTimeout(() => elements.modelStatus.classList.add('hidden'), 2000);
-    } catch (error) {
-        console.error('Ошибка загрузки модели:', error);
-        elements.modelStatusText.textContent = 'Ошибка загрузки ИИ модели';
-        aiModel = null;
-    } finally {
-        isModelLoading = false;
-    }
 }
 
 // Обработка загруженных файлов
@@ -463,30 +436,6 @@ async function applyAIEnhancement(imageData, progressCallback) {
         console.error('Ошибка ИИ обработки:', error);
         // Fallback на базовое улучшение
         return applyBasicEnhancement(imageData, progressCallback);
-    }
-}
-
-// Подготовка входных данных для ИИ
-function prepareInputTensor(imageData) {
-    const { data, width, height } = imageData;
-    const inputData = new Float32Array(width * height * 3);
-    
-    for (let i = 0, j = 0; i < data.length; i += 4, j += 3) {
-        inputData[j] = data[i] / 255.0;
-        inputData[j + 1] = data[i + 1] / 255.0;
-        inputData[j + 2] = data[i + 2] / 255.0;
-    }
-    
-    return new ort.Tensor('float32', inputData, [1, height, width, 3]);
-}
-
-// Применение результатов ИИ
-function applyModelOutput(imageData, outputTensor) {
-    const outputData = outputTensor.data;
-    for (let i = 0, j = 0; i < imageData.data.length; i += 4, j += 3) {
-        imageData.data[i] = Math.round(outputData[j] * 255);
-        imageData.data[i + 1] = Math.round(outputData[j + 1] * 255);
-        imageData.data[i + 2] = Math.round(outputData[j + 2] * 255);
     }
 }
 
