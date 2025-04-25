@@ -6,17 +6,39 @@
     <title>Улучшение изображений с ИИ</title>
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script>
+    <style>
+        /* Инлайн стили для критически важных элементов */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #1a0a0f;
+            color: #ffd6e7;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .hidden {
+            display: none !important;
+        }
+    </style>
 </head>
 <body>
     <canvas id="backgroundCanvas"></canvas>
     <div class="container">
-        <h1>Улучшение изображений с ИИ</h1>
+        <h1>Улучшение изображений с нейросетью</h1>
         
         <div class="upload-box">
             <div id="dropArea" class="drop-area">
                 <p>Перетащите сюда изображение или</p>
                 <button id="selectFiles" class="btn">Выбрать файл</button>
                 <p>Поддерживаются: JPG, PNG, WEBP (макс. 10MB)</p>
+                <div id="modelLoading" class="hidden">
+                    <p>Загрузка нейросети... <span id="modelProgress">0%</span></p>
+                    <progress id="modelLoadProgress" value="0" max="100"></progress>
+                </div>
             </div>
             <input type="file" id="fileInput" accept="image/*" style="display: none;">
         </div>
@@ -63,10 +85,11 @@
             
             <div class="checkbox-group">
                 <input type="checkbox" id="aiEnhance" checked>
-                <label for="aiEnhance">Улучшение ИИ (ESRGAN)</label>
+                <label for="aiEnhance">Улучшение нейросетью (ESRGAN)</label>
             </div>
             
             <button id="processBtn" class="btn">Улучшить изображение</button>
+            <button id="cancelBtn" class="btn hidden">Отменить обработку</button>
         </div>
 
         <div id="loading" class="loading hidden">
@@ -84,33 +107,69 @@
                 <div id="step7" class="loading-step">Финал.очистка</div>
                 <div id="step8" class="loading-step">Сохранение</div>
             </div>
+            <div id="gpuInfo" class="gpu-info"></div>
         </div>
 
         <div id="preview" class="preview-container hidden">
             <div class="image-box">
                 <h3>Оригинал</h3>
-                <img id="originalImage" src="" alt="Original">
+                <img id="originalImage" src="" alt="Original" crossorigin="anonymous">
                 <div id="originalInfo" class="image-info"></div>
             </div>
             <div class="image-box">
                 <h3>Результат</h3>
-                <img id="resultImage" src="" alt="Result">
+                <img id="resultImage" src="" alt="Result" crossorigin="anonymous">
                 <div id="resultInfo" class="image-info"></div>
                 <button id="downloadBtn" class="btn">Скачать результат</button>
+                <button id="compareBtn" class="btn">Сравнить</button>
             </div>
         </div>
 
-        <div id="modelStatus" class="model-status hidden">
-            <span id="modelStatusText">Состояние модели: загрузка...</span>
+        <div id="compareView" class="compare-view hidden">
+            <div class="compare-container">
+                <div class="compare-original">
+                    <h3>Оригинал</h3>
+                    <img id="compareOriginal" src="" alt="Original">
+                </div>
+                <div class="compare-slider">
+                    <input type="range" id="compareSlider" min="0" max="100" value="50">
+                </div>
+                <div class="compare-result">
+                    <h3>Результат</h3>
+                    <img id="compareResult" src="" alt="Result">
+                </div>
+            </div>
+            <button id="closeCompare" class="btn">Закрыть сравнение</button>
         </div>
 
         <footer>
-            <p>Инструмент для улучшения изображений с нейросетевым ИИ</p>
+            <p>Использует TensorFlow.js и модель ESRGAN для улучшения изображений</p>
+            <p class="tf-version">Версия TensorFlow: <span id="tfVersion"></span></p>
+            <p class="gpu-info">Ускорение: <span id="gpuStatus">Проверка...</span></p>
         </footer>
     </div>
 
     <script src="ripple-effect.js"></script>
-    <script src="model.js"></script>
     <script src="script.js"></script>
+    <script>
+        // Инициализация TensorFlow
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                document.getElementById('tfVersion').textContent = tf.version.tfjs;
+                const gpuInfo = await tf.ready();
+                const gpuStatus = document.getElementById('gpuStatus');
+                
+                if (gpuInfo && gpuInfo.isGPU) {
+                    gpuStatus.textContent = `GPU (${gpuInfo.deviceInfo.renderer})`;
+                    gpuStatus.style.color = '#4CAF50';
+                } else {
+                    gpuStatus.textContent = 'CPU (медленная обработка)';
+                    gpuStatus.style.color = '#FF5722';
+                }
+            } catch (e) {
+                console.error('Ошибка инициализации TF:', e);
+            }
+        });
+    </script>
 </body>
 </html>
