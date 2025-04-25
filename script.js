@@ -451,24 +451,17 @@ async function applyFullSmoothing(imageData, strength, progressCallback) {
 
 // Улучшение с помощью ИИ
 async function applyAIEnhancement(imageData, progressCallback) {
-    if (!aiModel) {
-        console.warn('ИИ модель не загружена, используется базовое улучшение');
-        return applyBasicEnhancement(imageData, progressCallback);
-    }
-
-    const startTime = performance.now();
-    const width = imageData.width;
-    const height = imageData.height;
-    
     try {
-        const inputTensor = prepareInputTensor(imageData);
-        const outputs = await aiModel.run({ 'input': inputTensor });
-        applyModelOutput(imageData, outputs.output);
+        if (!imageEnhancer.ready) {
+            throw new Error('Модель не загружена');
+        }
         
+        const startTime = performance.now();
+        await imageEnhancer.enhance(imageData, progressCallback);
         console.log(`ИИ обработка заняла ${(performance.now() - startTime).toFixed(1)}ms`);
-        progressCallback(1);
     } catch (error) {
         console.error('Ошибка ИИ обработки:', error);
+        // Fallback на базовое улучшение
         return applyBasicEnhancement(imageData, progressCallback);
     }
 }
