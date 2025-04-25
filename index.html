@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Улучшение изображений с ИИ</title>
     <link rel="stylesheet" href="styles.css">
-    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script>
 </head>
 <body>
@@ -41,8 +40,6 @@
                     <option value="1">1x (оригинал)</option>
                     <option value="2">2x</option>
                     <option value="4" selected>4x</option>
-                    <option value="8">8x</option>
-                    <option value="16">16x</option>
                 </select>
             </div>
             
@@ -66,7 +63,7 @@
             
             <div class="checkbox-group">
                 <input type="checkbox" id="aiEnhance" checked>
-                <label for="aiEnhance">Улучшение ИИ (Real-ESRGAN)</label>
+                <label for="aiEnhance">Улучшение ИИ (ESRGAN)</label>
             </div>
             
             <button id="processBtn" class="btn">Улучшить изображение</button>
@@ -113,6 +110,7 @@
     </div>
 
     <script src="ripple-effect.js"></script>
+    <script src="model.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
