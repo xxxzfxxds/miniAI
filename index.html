@@ -3,13 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Улучшение изображений</title>
+    <title>Улучшение изображений с ИИ</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script>
 </head>
 <body>
     <canvas id="backgroundCanvas"></canvas>
     <div class="container">
-        <h1>Улучшение изображений</h1>
+        <h1>Улучшение изображений с ИИ</h1>
         
         <div class="upload-box">
             <div id="dropArea" class="drop-area">
@@ -64,7 +66,7 @@
             
             <div class="checkbox-group">
                 <input type="checkbox" id="aiEnhance" checked>
-                <label for="aiEnhance">Дорисовка деталей ИИ</label>
+                <label for="aiEnhance">Улучшение ИИ (Real-ESRGAN)</label>
             </div>
             
             <button id="processBtn" class="btn">Улучшить изображение</button>
@@ -80,7 +82,7 @@
                 <div id="step2" class="loading-step">Очистка</div>
                 <div id="step3" class="loading-step">Масштаб</div>
                 <div id="step4" class="loading-step">Сглаживание</div>
-                <div id="step5" class="loading-step">ИИ</div>
+                <div id="step5" class="loading-step">ИИ-улучшение</div>
                 <div id="step6" class="loading-step">Резкость</div>
                 <div id="step7" class="loading-step">Финал.очистка</div>
                 <div id="step8" class="loading-step">Сохранение</div>
@@ -101,8 +103,12 @@
             </div>
         </div>
 
+        <div id="modelStatus" class="model-status hidden">
+            <span id="modelStatusText">Состояние модели: загрузка...</span>
+        </div>
+
         <footer>
-            <p>Инструмент для улучшения изображений с двукратной очисткой шумов</p>
+            <p>Инструмент для улучшения изображений с нейросетевым ИИ</p>
         </footer>
     </div>
 
