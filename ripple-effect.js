@@ -56,4 +56,5 @@ class RippleEffect {
     }
 }
 
+// Запуск эффекта
 new RippleEffect();
