@@ -1,4 +1,3 @@
-// DOM Elements
 const dropArea = document.getElementById('dropArea');
 const fileInput = document.getElementById('fileInput');
 const selectFilesBtn = document.getElementById('selectFiles');
@@ -25,48 +24,60 @@ const sharpnessValue = document.getElementById('sharpnessValue');
 const aiEnhanceCheckbox = document.getElementById('aiEnhance');
 const progressBar = document.getElementById('progressBar');
 
-// Global Variables
 let selectedFile = null;
 let isProcessing = false;
-let esrganModel = null;
-
-// Initialize on DOM load
-document.addEventListener('DOMContentLoaded', init);
 
 function init() {
-    setupEventListeners();
-    updateAllLabels();
-}
-
-function setupEventListeners() {
-    // Slider events
-    denoiseStrength.addEventListener('input', () => updateLabel(denoiseStrength, denoiseValue, ['очень лёгкая', 'лёгкая', 'умеренная', 'сильная']));
-    finalDenoiseStrength.addEventListener('input', () => updateLabel(finalDenoiseStrength, finalDenoiseValue, ['очень лёгкая', 'лёгкая', 'умеренная', 'сильная']));
-    qualitySlider.addEventListener('input', () => updateLabel(qualitySlider, qualityValue, ['низкое', 'среднее', 'хорошее', 'отличное']));
-    smoothStrength.addEventListener('input', () => updateLabel(smoothStrength, smoothValue, ['умное', 'адаптивное', 'сильное', 'ультра-плавное']));
-    sharpnessSlider.addEventListener('input', () => updateLabel(sharpnessSlider, sharpnessValue, ['слабая', 'умеренная', 'сильная', 'экстремальная']));
-
-    // Button events
+    denoiseStrength.addEventListener('input', updateDenoiseLabel);
+    finalDenoiseStrength.addEventListener('input', updateFinalDenoiseLabel);
+    qualitySlider.addEventListener('input', updateQualityLabel);
+    smoothStrength.addEventListener('input', updateSmoothLabel);
+    sharpnessSlider.addEventListener('input', updateSharpnessLabel);
+    
+    updateDenoiseLabel();
+    updateFinalDenoiseLabel();
+    updateQualityLabel();
+    updateSmoothLabel();
+    updateSharpnessLabel();
+    
     selectFilesBtn.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', handleFiles);
-    processBtn.addEventListener('click', processImage);
-    downloadBtn.addEventListener('click', downloadResult);
-
-    // Drag and drop events
+    
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
         dropArea.addEventListener(eventName, preventDefaults, false);
         document.body.addEventListener(eventName, preventDefaults, false);
     });
-    ['dragenter', 'dragover'].forEach(eventName => dropArea.addEventListener(eventName, highlight, false));
-    ['dragleave', 'drop'].forEach(eventName => dropArea.addEventListener(eventName, unhighlight, false));
+    
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropArea.addEventListener(eventName, highlight, false);
+    });
+    
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, unhighlight, false);
+    });
+    
     dropArea.addEventListener('drop', handleDrop, false);
+    processBtn.addEventListener('click', processImage);
+    downloadBtn.addEventListener('click', downloadResult);
 }
 
-function updateAllLabels() {
+function updateDenoiseLabel() {
     updateLabel(denoiseStrength, denoiseValue, ['очень лёгкая', 'лёгкая', 'умеренная', 'сильная']);
+}
+
+function updateFinalDenoiseLabel() {
     updateLabel(finalDenoiseStrength, finalDenoiseValue, ['очень лёгкая', 'лёгкая', 'умеренная', 'сильная']);
+}
+
+function updateQualityLabel() {
     updateLabel(qualitySlider, qualityValue, ['низкое', 'среднее', 'хорошее', 'отличное']);
+}
+
+function updateSmoothLabel() {
     updateLabel(smoothStrength, smoothValue, ['умное', 'адаптивное', 'сильное', 'ультра-плавное']);
+}
+
+function updateSharpnessLabel() {
     updateLabel(sharpnessSlider, sharpnessValue, ['слабая', 'умеренная', 'сильная', 'экстремальная']);
 }
 
@@ -117,19 +128,6 @@ function handleDrop(e) {
     const dt = e.dataTransfer;
     const files = dt.files;
     handleFiles({ target: { files } });
-}
-
-function preventDefaults(e) {
-    e.preventDefault();
-    e.stopPropagation();
-}
-
-function highlight() {
-    dropArea.classList.add('highlight');
-}
-
-function unhighlight() {
-    dropArea.classList.remove('highlight');
 }
 
 async function processImage() {
@@ -188,9 +186,12 @@ async function processImage() {
         
         if (aiEnhanceCheckbox.checked) {
             updateStep('step5');
-            progressBar.style.width = '45%';
-            await applyRealESRGAN(canvas);
-            await updateProgress(60, 300);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            await applyAIEnhancement(imageData, (progress) => {
+                progressBar.style.width = `${45 + progress * 15}%`;
+            });
+            ctx.putImageData(imageData, 0, 0);
+            await updateProgress(60, 500);
         }
         
         const sharpnessValue = parseFloat(sharpnessSlider.value);
@@ -228,54 +229,70 @@ async function processImage() {
     } catch (error) {
         console.error('Ошибка обработки:', error);
         loadingDiv.classList.add('hidden');
-        alert('Произошла ошибка: ' + error.message);
+        alert('Произошла ошибка при обработке изображения');
     } finally {
         isProcessing = false;
     }
 }
 
-// Neural Network Functions
-async function loadESRGANModel() {
-    if (!esrganModel) {
-        console.log('Загрузка модели ESRGAN...');
-        try {
-            esrganModel = await tf.loadGraphModel(
-                'https://tfhub.dev/captain-pool/esrgan-tf2/1', 
-                { fromTFHub: true }
-            );
-            console.log('Модель ESRGAN загружена');
-        } catch (error) {
-            console.error('Ошибка загрузки модели:', error);
-            throw new Error('Не удалось загрузить нейросеть');
-        }
-    }
-    return esrganModel;
-}
-
-async function applyRealESRGAN(canvas) {
-    const model = await loadESRGANModel();
-    const startTime = performance.now();
-    
+async function applyAIEnhancement(imageData, progressCallback) {
     try {
-        const tensor = tf.browser.fromPixels(canvas)
-            .toFloat()
-            .div(255.0)
-            .expandDims(0);
+        // 1. Создаем временный canvas
+        const canvas = document.createElement('canvas');
+        canvas.width = imageData.width;
+        canvas.height = imageData.height;
+        const ctx = canvas.getContext('2d');
+        ctx.putImageData(imageData, 0, 0);
         
-        const enhanced = model.predict(tensor);
-        await tf.browser.toPixels(enhanced.squeeze(), canvas);
+        // 2. Конвертируем в Blob
+        const blob = await new Promise((resolve) => {
+            canvas.toBlob(resolve, 'image/jpeg', 0.9);
+        });
         
-        console.log(`Улучшение заняло ${((performance.now() - startTime)/1000).toFixed(1)} сек`);
+        // 3. Отправляем на API (пример для DeepAI)
+        const formData = new FormData();
+        formData.append('image', blob, 'enhance.jpg');
         
-        tensor.dispose();
-        enhanced.dispose();
+        const response = await fetch('https://api.deepai.org/waifu2x', {
+            method: 'POST',
+            headers: {
+                'api-key': 'd1723844-52be-44bc-a730-ac4e1a2dfb88' // Ваш API-ключ
+            },
+            body: formData
+        });
+        
+        if (!response.ok) throw new Error('API error: ' + response.status);
+        
+        // 4. Получаем результат
+        const resultBlob = await response.blob();
+        const resultUrl = URL.createObjectURL(resultBlob);
+        
+        // 5. Загружаем обработанное изображение
+        const img = await loadImageFromUrl(resultUrl);
+        ctx.drawImage(img, 0, 0);
+        const newImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        
+        // 6. Копируем данные обратно
+        for (let i = 0; i < imageData.data.length; i++) {
+            imageData.data[i] = newImageData.data[i];
+        }
+        
+        progressCallback(1);
     } catch (error) {
-        console.error('Ошибка ESRGAN:', error);
-        throw new Error('Нейросеть не смогла обработать изображение');
+        console.error('AI Enhancement Error:', error);
+        throw error;
     }
 }
 
-// Image Processing Functions
+async function loadImageFromUrl(url) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = url;
+    });
+}
+
 async function applyBilateralFilter(imageData, strength, progressCallback) {
     const data = imageData.data;
     const width = imageData.width;
@@ -361,6 +378,7 @@ async function applyFullSmoothing(imageData, strength, progressCallback) {
     const buffer1 = new Uint8ClampedArray(data);
     const buffer2 = new Uint8ClampedArray(data.length);
     
+    // 1. Анизотропное размытие
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
             const idx = (y * width + x) * 4;
@@ -415,6 +433,7 @@ async function applyFullSmoothing(imageData, strength, progressCallback) {
         }
     }
     
+    // 2. Билатеральная фильтрация
     const sigmaColor = 10 + strength * 2;
     for (let i = 0; i < data.length; i += 4) {
         const x = (i / 4) % width;
@@ -540,7 +559,6 @@ function createGaussianKernel(radius) {
     return kernel;
 }
 
-// Utility Functions
 function clamp(value) {
     return Math.max(0, Math.min(255, value));
 }
@@ -552,6 +570,19 @@ function loadImage(file) {
         img.onerror = reject;
         img.src = URL.createObjectURL(file);
     });
+}
+
+function preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
+}
+
+function highlight() {
+    dropArea.classList.add('highlight');
+}
+
+function unhighlight() {
+    dropArea.classList.remove('highlight');
 }
 
 async function updateProgress(percent, duration) {
@@ -589,3 +620,5 @@ function formatSize(bytes) {
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' КБ';
     return (bytes / (1024 * 1024)).toFixed(1) + ' МБ';
 }
+
+document.addEventListener('DOMContentLoaded', init);
