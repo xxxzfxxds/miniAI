@@ -18,20 +18,27 @@ const finalDenoiseValue = document.getElementById('finalDenoiseValue');
 const scaleFactor = document.getElementById('scaleFactor');
 const qualitySlider = document.getElementById('quality');
 const qualityValue = document.getElementById('qualityValue');
-const smoothStrength = document.getElementById('smoothStrength');
-const smoothValue = document.getElementById('smoothValue');
-const sharpnessSlider = document.getElementById('sharpness');
-const sharpnessValue = document.getElementById('sharpnessValue');
 const aiEnhanceCheckbox = document.getElementById('aiEnhance');
 const progressBar = document.getElementById('progressBar');
 
 // Состояние приложения
 let selectedFile = null;
 let isProcessing = false;
+let model = null;
 
 // Инициализация приложения
-function init() {
+async function init() {
     console.log('Инициализация приложения...');
+    
+    // Загрузка модели
+    try {
+        console.log('Загрузка модели Waifu2x...');
+        model = await tf.loadGraphModel('scale2.0x_model.json');
+        console.log('Модель успешно загружена');
+    } catch (error) {
+        console.error('Ошибка загрузки модели:', error);
+        alert('Не удалось загрузить модель улучшения. Проверьте консоль для подробностей.');
+    }
     
     // Проверка существования элементов
     if (!fileInput || !dropArea) {
@@ -53,15 +60,11 @@ function setupSliders() {
     denoiseStrength.addEventListener('input', () => updateLabel(denoiseStrength, denoiseValue, ['очень лёгкая', 'лёгкая', 'умеренная', 'сильная']));
     finalDenoiseStrength.addEventListener('input', () => updateLabel(finalDenoiseStrength, finalDenoiseValue, ['очень лёгкая', 'лёгкая', 'умеренная', 'сильная']));
     qualitySlider.addEventListener('input', () => updateLabel(qualitySlider, qualityValue, ['низкое', 'среднее', 'хорошее', 'отличное']));
-    smoothStrength.addEventListener('input', () => updateLabel(smoothStrength, smoothValue, ['умное', 'адаптивное', 'сильное', 'ультра-плавное']));
-    sharpnessSlider.addEventListener('input', () => updateLabel(sharpnessSlider, sharpnessValue, ['слабая', 'умеренная', 'сильная', 'экстремальная']));
     
     // Инициализация значений
     updateLabel(denoiseStrength, denoiseValue, ['очень лёгкая', 'лёгкая', 'умеренная', 'сильная']);
     updateLabel(finalDenoiseStrength, finalDenoiseValue, ['очень лёгкая', 'лёгкая', 'умеренная', 'сильная']);
     updateLabel(qualitySlider, qualityValue, ['низкое', 'среднее', 'хорошее', 'отличное']);
-    updateLabel(smoothStrength, smoothValue, ['умное', 'адаптивное', 'сильное', 'ультра-плавное']);
-    updateLabel(sharpnessSlider, sharpnessValue, ['слабая', 'умеренная', 'сильная', 'экстремальная']);
 }
 
 // Настройка обработчиков событий
@@ -169,6 +172,11 @@ async function processImage() {
         return;
     }
     
+    if (aiEnhanceCheckbox.checked && !model) {
+        alert('Модель улучшения не загружена. Пожалуйста, попробуйте позже.');
+        return;
+    }
+    
     console.log('Начало обработки изображения...');
     isProcessing = true;
     
@@ -176,10 +184,8 @@ async function processImage() {
     optionsDiv.classList.add('hidden');
     previewDiv.classList.add('hidden');
     progressBar.style.width = '0%';
-    resetSteps();
     
     try {
-        updateStep('step1');
         await updateProgress(5, 500);
         
         console.log('Загрузка изображения...');
@@ -196,7 +202,6 @@ async function processImage() {
         // Первичное шумоподавление
         const denoiseStrengthValue = parseFloat(denoiseStrength.value);
         if (denoiseStrengthValue > 0) {
-            updateStep('step2');
             console.log('Применение первичного шумоподавления...');
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             await applyBilateralFilter(imageData, denoiseStrengthValue, (progress) => {
@@ -207,7 +212,6 @@ async function processImage() {
         }
         
         // Масштабирование
-        updateStep('step3');
         const scale = parseInt(scaleFactor.value);
         canvas.width = img.width * scale;
         canvas.height = img.height * scale;
@@ -217,59 +221,51 @@ async function processImage() {
         console.log('Масштабирование завершено:', canvas.width, '×', canvas.height);
         await updateProgress(30, 800);
         
-        // Сглаживание
-        const smoothStrengthValue = parseFloat(smoothStrength.value);
-        if (smoothStrengthValue > 0) {
-            updateStep('step4');
-            console.log('Применение сглаживания...');
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            await applyFullSmoothing(imageData, smoothStrengthValue, (progress) => {
-                progressBar.style.width = `${30 + progress * 15}%`;
-            });
-            ctx.putImageData(imageData, 0, 0);
-            await updateProgress(45, 300);
-        }
-        
         // ИИ-улучшение
         if (aiEnhanceCheckbox.checked) {
-            updateStep('step5');
             console.log('Применение ИИ-улучшения...');
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            await applyAIEnhancement(imageData, (progress) => {
-                progressBar.style.width = `${45 + progress * 15}%`;
-            });
+            
+            // Применяем модель несколько раз если нужно 4x увеличение
+            const iterations = scale === 4 ? 2 : 1;
+            
+            for (let i = 0; i < iterations; i++) {
+                await applyAIEnhancement(imageData, (progress) => {
+                    const totalProgress = 30 + (i + progress) * (30 / iterations);
+                    progressBar.style.width = `${totalProgress}%`;
+                });
+                
+                // После первого прохода (2x) масштабируем canvas для второго прохода
+                if (i === 0 && iterations > 1) {
+                    const tempCanvas = document.createElement('canvas');
+                    const tempCtx = tempCanvas.getContext('2d');
+                    tempCanvas.width = canvas.width * 2;
+                    tempCanvas.height = canvas.height * 2;
+                    tempCtx.putImageData(imageData, 0, 0);
+                    
+                    canvas.width = tempCanvas.width;
+                    canvas.height = tempCanvas.height;
+                    ctx.putImageData(imageData, 0, 0);
+                }
+            }
+            
             ctx.putImageData(imageData, 0, 0);
             await updateProgress(60, 500);
-        }
-        
-        // Увеличение резкости
-        const sharpnessValue = parseFloat(sharpnessSlider.value);
-        if (sharpnessValue > 0) {
-            updateStep('step6');
-            console.log('Увеличение резкости...');
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            await applySharpness(imageData, sharpnessValue, (progress) => {
-                progressBar.style.width = `${60 + progress * 15}%`;
-            });
-            ctx.putImageData(imageData, 0, 0);
-            await updateProgress(75, 300);
         }
         
         // Финальное шумоподавление
         const finalDenoiseStrengthValue = parseFloat(finalDenoiseStrength.value);
         if (finalDenoiseStrengthValue > 0) {
-            updateStep('step7');
             console.log('Финальное шумоподавление...');
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             await applyBilateralFilter(imageData, finalDenoiseStrengthValue, (progress) => {
-                progressBar.style.width = `${75 + progress * 15}%`;
+                progressBar.style.width = `${60 + progress * 20}%`;
             });
             ctx.putImageData(imageData, 0, 0);
-            await updateProgress(90, 300);
+            await updateProgress(80, 300);
         }
         
         // Сохранение результата
-        updateStep('step8');
         await updateProgress(95, 500);
         const quality = qualitySlider.value / 10;
         resultImage.src = canvas.toDataURL('image/jpeg', quality);
@@ -295,25 +291,90 @@ async function processImage() {
 // Билатеральный фильтр
 async function applyBilateralFilter(imageData, strength, progressCallback) {
     console.log('Применение билатерального фильтра (сила:', strength, ')');
-    // ... (остальной код функции без изменений)
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+    
+    // Упрощенная реализация билатерального фильтра
+    const radius = Math.floor(strength);
+    const sigma = strength * 2;
+    
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const i = (y * width + x) * 4;
+            let r = 0, g = 0, b = 0, total = 0;
+            
+            for (let dy = -radius; dy <= radius; dy++) {
+                for (let dx = -radius; dx <= radius; dx++) {
+                    const nx = x + dx;
+                    const ny = y + dy;
+                    
+                    if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                        const ni = (ny * width + nx) * 4;
+                        const dist = Math.sqrt(dx*dx + dy*dy);
+                        const weight = Math.exp(-(dist*dist)/(2*sigma*sigma));
+                        
+                        r += data[ni] * weight;
+                        g += data[ni+1] * weight;
+                        b += data[ni+2] * weight;
+                        total += weight;
+                    }
+                }
+            }
+            
+            data[i] = r / total;
+            data[i+1] = g / total;
+            data[i+2] = b / total;
+        }
+        
+        if (progressCallback && y % 10 === 0) {
+            progressCallback(y / height);
+        }
+    }
+    
+    if (progressCallback) progressCallback(1);
+    return imageData;
 }
 
-// Полное сглаживание
-async function applyFullSmoothing(imageData, strength, progressCallback) {
-    console.log('Применение адаптивного сглаживания (сила:', strength, ')');
-    // ... (остальной код функции без изменений)
-}
-
-// Имитация ИИ-улучшения
+// Реальное ИИ-улучшение с Waifu2x
 async function applyAIEnhancement(imageData, progressCallback) {
-    console.log('Применение ИИ-улучшения');
-    // ... (остальной код функции без изменений)
-}
+    console.log('Применение реального ИИ-улучшения...');
+    
+    // Проверка, что модель загружена
+    if (!model) {
+        throw new Error('Модель улучшения не загружена');
+    }
+    
+    // Создаем тензор из ImageData
+    const inputTensor = tf.browser.fromPixels({
+        data: new Uint8Array(imageData.data),
+        width: imageData.width,
+        height: imageData.height
+    }).toFloat().div(tf.scalar(255)).expandDims(0);
 
-// Увеличение резкости
-async function applySharpness(imageData, sharpness, progressCallback) {
-    console.log('Увеличение резкости (сила:', sharpness, ')');
-    // ... (остальной код функции без изменений)
+    // Применяем модель
+    let outputTensor;
+    try {
+        outputTensor = model.predict(inputTensor);
+    } catch (error) {
+        console.error('Ошибка предсказания:', error);
+        throw error;
+    }
+
+    // Конвертируем результат обратно в ImageData
+    const outputData = await tf.browser.toPixels(outputTensor.squeeze().mul(tf.scalar(255)).clipByValue(0, 255));
+    
+    // Копируем данные обратно в оригинальный ImageData
+    for (let i = 0; i < outputData.length; i++) {
+        imageData.data[i] = outputData[i] * 255;
+    }
+
+    // Освобождаем память
+    inputTensor.dispose();
+    outputTensor.dispose();
+    
+    if (progressCallback) progressCallback(1);
+    return imageData;
 }
 
 // ====================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ======================
@@ -368,20 +429,6 @@ async function updateProgress(percent, duration) {
     });
 }
 
-function updateStep(stepId) {
-    resetSteps();
-    const step = document.getElementById(stepId);
-    if (step) {
-        step.classList.add('active', 'pulse-animation');
-    }
-}
-
-function resetSteps() {
-    document.querySelectorAll('.loading-step').forEach(step => {
-        step.classList.remove('active', 'pulse-animation');
-    });
-}
-
 function downloadResult() {
     if (!resultImage.src) {
         console.warn('Нет результата для скачивания');
@@ -403,23 +450,4 @@ function formatSize(bytes) {
 }
 
 // Инициализация при загрузке страницы
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOM полностью загружен');
-    init();
-});
-
-// Для отладки в глобальной области видимости
-window.app = {
-    debug: () => {
-        console.log('Состояние приложения:', {
-            selectedFile,
-            isProcessing,
-            elements: {
-                fileInput,
-                dropArea,
-                originalImage,
-                resultImage
-            }
-        });
-    }
-};
+document.addEventListener('DOMContentLoaded', init);
