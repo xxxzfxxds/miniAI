@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Улучшение изображений с Waifu2x</title>
+    <title>Улучшение изображений</title>
     <link rel="stylesheet" href="styles.css">
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script>
 </head>
 <body>
     <canvas id="backgroundCanvas"></canvas>
@@ -40,6 +39,8 @@
                     <option value="1">1x (оригинал)</option>
                     <option value="2">2x</option>
                     <option value="4" selected>4x</option>
+                    <option value="8">8x</option>
+                    <option value="16">16x</option>
                 </select>
             </div>
             
@@ -49,9 +50,21 @@
                 <span id="qualityValue">9/10 (отличное)</span>
             </div>
             
+            <div class="option-group">
+                <label for="smoothStrength">Сглаживание:</label>
+                <input type="range" id="smoothStrength" min="0" max="10" step="0.5" value="6">
+                <span id="smoothValue">6/10 (плавное)</span>
+            </div>
+            
+            <div class="option-group">
+                <label for="sharpness">Резкость:</label>
+                <input type="range" id="sharpness" min="0" max="10" step="0.5" value="5">
+                <span id="sharpnessValue">5/10 (умеренная)</span>
+            </div>
+            
             <div class="checkbox-group">
                 <input type="checkbox" id="aiEnhance" checked>
-                <label for="aiEnhance">ИИ-улучшение (Waifu2x)</label>
+                <label for="aiEnhance">Дорисовка деталей ИИ</label>
             </div>
             
             <button id="processBtn" class="btn">Улучшить изображение</button>
@@ -61,6 +74,16 @@
             <p>Обработка изображения</p>
             <div class="progress-container">
                 <div id="progressBar" class="progress-bar"></div>
+            </div>
+            <div class="loading-steps">
+                <div id="step1" class="loading-step">Загрузка</div>
+                <div id="step2" class="loading-step">Очистка</div>
+                <div id="step3" class="loading-step">Масштаб</div>
+                <div id="step4" class="loading-step">Сглаживание</div>
+                <div id="step5" class="loading-step">ИИ</div>
+                <div id="step6" class="loading-step">Резкость</div>
+                <div id="step7" class="loading-step">Финал.очистка</div>
+                <div id="step8" class="loading-step">Сохранение</div>
             </div>
         </div>
 
@@ -79,7 +102,7 @@
         </div>
 
         <footer>
-            <p>Использует Waifu2x модель (MIT License) | <a href="https://github.com/nagadomi/waifu2x" target="_blank">Автор: Nagadomi</a></p>
+            <p>Инструмент для улучшения изображений с двукратной очисткой шумов</p>
         </footer>
     </div>
 
