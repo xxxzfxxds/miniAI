@@ -18,12 +18,10 @@ class RippleEffect {
     initEvents() {
         window.addEventListener('resize', () => this.resize());
         
-        // Плавное отслеживание движения мыши
         window.addEventListener('mousemove', (e) => {
             this.mouse.x = e.clientX;
             this.mouse.y = e.clientY;
             
-            // Создаем волны только при значительном перемещении
             const dx = this.mouse.x - this.lastMouse.x;
             const dy = this.mouse.y - this.lastMouse.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
@@ -35,7 +33,6 @@ class RippleEffect {
             }
         });
         
-        // Волны при клике
         window.addEventListener('click', (e) => {
             this.createRipples(e.clientX, e.clientY, 15);
         });
@@ -62,17 +59,16 @@ class RippleEffect {
 
     getRandomPinkColor() {
         const colors = [
-            '255, 105, 180', // HotPink
-            '255, 20, 147',  // DeepPink
-            '255, 182, 193', // LightPink
-            '219, 112, 147', // PaleVioletRed
-            '199, 21, 133'  // MediumVioletRed
+            '255, 105, 180',
+            '255, 20, 147',
+            '255, 182, 193',
+            '219, 112, 147',
+            '199, 21, 133'
         ];
         return colors[Math.floor(Math.random() * colors.length)];
     }
 
     drawWave() {
-        // Плавное затемнение фона вместо полной очистки
         this.ctx.fillStyle = 'rgba(26, 10, 15, 0.05)';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
@@ -80,7 +76,6 @@ class RippleEffect {
             point.size += point.speed;
             point.alpha = Math.max(0, 0.7 * (1 - point.size / point.maxSize));
 
-            // Рисуем градиент для более красивого эффекта
             const gradient = this.ctx.createRadialGradient(
                 point.x, point.y, 0,
                 point.x, point.y, point.size
@@ -99,7 +94,6 @@ class RippleEffect {
             }
         });
 
-        // Добавляем след от мыши
         if (this.points.length > 0) {
             const dx = this.mouse.x - this.lastMouse.x;
             const dy = this.mouse.y - this.lastMouse.y;
@@ -117,7 +111,6 @@ class RippleEffect {
     }
 }
 
-// Инициализация эффекта
 document.addEventListener('DOMContentLoaded', () => {
     new RippleEffect();
 });
