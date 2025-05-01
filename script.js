@@ -1,9 +1,3 @@
-// Глобальные переменные
-let enhancementWeights = null;
-let selectedFile = null;
-let isProcessing = false;
-
-// DOM элементы
 const dropArea = document.getElementById('dropArea');
 const fileInput = document.getElementById('fileInput');
 const selectFilesBtn = document.getElementById('selectFiles');
@@ -30,152 +24,269 @@ const sharpnessValue = document.getElementById('sharpnessValue');
 const aiEnhanceCheckbox = document.getElementById('aiEnhance');
 const progressBar = document.getElementById('progressBar');
 
-// Загрузка весов модели
-async function loadWeights() {
-    try {
-        const response = await fetch('weights.json');
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const data = await response.json();
-        
-        // Валидация структуры
-        if (!data.models_coef || !data.feature_names || !data.target_params) {
-            throw new Error('Invalid weights.json structure');
-        }
-        
-        enhancementWeights = data;
-        console.log('Weights loaded successfully');
-    } catch (error) {
-        console.error('Failed to load weights:', error);
-        // Значения по умолчанию
-        enhancementWeights = {
-            models_coef: [
-                [0.12, -0.23, 0.05, 0.18, -0.07, 0.31, 0.0005, 0.0003],
-                [0.08, -0.15, 0.03, 0.12, -0.05, 0.21, 0.0003, 0.0002],
-                [0.05, -0.1, 0.02, 0.08, -0.03, 0.15, 0.0002, 0.0001],
-                [0.15, -0.18, 0.04, 0.15, -0.06, 0.25, 0.0004, 0.0003],
-                [0.1, -0.2, 0.03, 0.13, -0.05, 0.22, 0.0003, 0.0002],
-                [0.18, -0.25, 0.06, 0.2, -0.08, 0.35, 0.0006, 0.0004],
-                [0.07, -0.12, 0.02, 0.1, -0.04, 0.18, 0.0002, 0.0001]
-            ],
-            models_intercept: [4.2, 2.8, 1.5, 6.8, 3.5, 4.8, 0.3],
-            feature_names: ['mean', 'std', 'min', 'max', 'median', 'percentile_25', 'width', 'height'],
-            target_params: [
-                "denoise_strength",
-                "final_denoise_strength",
-                "scale_factor",
-                "quality",
-                "smooth_strength",
-                "sharpness",
-                "ai_enhance"
-            ]
-        };
-    }
-}
+// Весовые коэффициенты
+const weightsInput = document.getElementById('weightsInput');
+const loadWeightsBtn = document.getElementById('loadWeights');
+const weightsInfo = document.getElementById('weightsInfo');
+let currentWeights = null;
+let selectedFile = null;
+let isProcessing = false;
 
-// Вспомогательные функции
-function calculateMedian(values) {
-    if (!values.length) return 0;
-    const sorted = [...values].sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-}
-
-function calculatePercentile(values, p) {
-    if (!values.length) return 0;
-    const sorted = [...values].sort((a, b) => a - b);
-    const pos = p * (sorted.length - 1);
-    const base = Math.floor(pos);
-    const rest = pos - base;
+function init() {
+    // Инициализация обработчиков событий
+    denoiseStrength.addEventListener('input', updateDenoiseLabel);
+    finalDenoiseStrength.addEventListener('input', updateFinalDenoiseLabel);
+    qualitySlider.addEventListener('input', updateQualityLabel);
+    smoothStrength.addEventListener('input', updateSmoothLabel);
+    sharpnessSlider.addEventListener('input', updateSharpnessLabel);
     
-    if (base + 1 >= sorted.length) return sorted[base];
-    return sorted[base] + rest * (sorted[base + 1] - sorted[base]);
+    updateDenoiseLabel();
+    updateFinalDenoiseLabel();
+    updateQualityLabel();
+    updateSmoothLabel();
+    updateSharpnessLabel();
+    
+    selectFilesBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', handleFiles);
+    
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false);
+    });
+    
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropArea.addEventListener(eventName, highlight, false);
+    });
+    
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, unhighlight, false);
+    });
+    
+    dropArea.addEventListener('drop', handleDrop, false);
+    processBtn.addEventListener('click', processImage);
+    downloadBtn.addEventListener('click', downloadResult);
+    
+    // Инициализация загрузки весов
+    loadWeightsBtn.addEventListener('click', () => weightsInput.click());
+    weightsInput.addEventListener('change', handleWeightsFile);
 }
 
-function clamp(value) {
-    return Math.max(0, Math.min(255, value));
-}
+function handleWeightsFile(e) {
+    const file = e.target.files[0];
+    if (!file) return;
 
-// Анализ изображения и расчет параметров
-async function calculateEnhancementParams(img) {
-    try {
-        if (!img || !img.width || !img.height || img.width * img.height === 0) {
-            throw new Error('Invalid image dimensions');
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            currentWeights = JSON.parse(e.target.result);
+            applyWeights(currentWeights);
+            weightsInfo.textContent = `Загружены веса для ${currentWeights.original_small_size} → ${currentWeights.original_large_size}`;
+            weightsInfo.style.color = '#4CAF50';
+        } catch (error) {
+            weightsInfo.textContent = 'Ошибка загрузки файла весов';
+            weightsInfo.style.color = '#FF5722';
+            console.error('Error parsing weights file:', error);
         }
+    };
+    reader.readAsText(file);
+}
 
+function applyWeights(weights) {
+    denoiseStrength.value = weights.denoise_strength;
+    finalDenoiseStrength.value = weights.final_denoise_strength;
+    scaleFactor.value = weights.scale_factor;
+    qualitySlider.value = weights.quality;
+    smoothStrength.value = weights.smooth_strength;
+    sharpnessSlider.value = weights.sharpness;
+    aiEnhanceCheckbox.checked = weights.ai_enhance;
+    
+    updateDenoiseLabel();
+    updateFinalDenoiseLabel();
+    updateQualityLabel();
+    updateSmoothLabel();
+    updateSharpnessLabel();
+}
+
+function updateDenoiseLabel() {
+    updateLabel(denoiseStrength, denoiseValue, ['очень лёгкая', 'лёгкая', 'умеренная', 'сильная']);
+}
+
+function updateFinalDenoiseLabel() {
+    updateLabel(finalDenoiseStrength, finalDenoiseValue, ['очень лёгкая', 'лёгкая', 'умеренная', 'сильная']);
+}
+
+function updateQualityLabel() {
+    updateLabel(qualitySlider, qualityValue, ['низкое', 'среднее', 'хорошее', 'отличное']);
+}
+
+function updateSmoothLabel() {
+    updateLabel(smoothStrength, smoothValue, ['умное', 'адаптивное', 'сильное', 'ультра-плавное']);
+}
+
+function updateSharpnessLabel() {
+    updateLabel(sharpnessSlider, sharpnessValue, ['слабая', 'умеренная', 'сильная', 'экстремальная']);
+}
+
+function updateLabel(slider, valueElement, labels) {
+    const value = slider.value;
+    let text = `${value}/10 (`;
+    
+    if (value < 3) text += labels[0];
+    else if (value < 6) text += labels[1];
+    else if (value < 8) text += labels[2];
+    else text += labels[3];
+    
+    text += ')';
+    valueElement.textContent = text;
+}
+
+function handleFiles(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    if (!file.type.match('image.*')) {
+        alert('Пожалуйста, выберите изображение');
+        return;
+    }
+    
+    if (file.size > 10 * 1024 * 1024) {
+        alert('Файл слишком большой. Максимальный размер 10MB');
+        return;
+    }
+    
+    selectedFile = file;
+    optionsDiv.classList.remove('hidden');
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        originalImage.src = e.target.result;
+        
+        const img = new Image();
+        img.onload = function() {
+            originalInfo.textContent = `${img.width} × ${img.height}px | ${formatSize(file.size)}`;
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function handleDrop(e) {
+    const dt = e.dataTransfer;
+    const files = dt.files;
+    handleFiles({ target: { files } });
+}
+
+async function processImage() {
+    if (isProcessing || !selectedFile) return;
+    
+    const params = currentWeights || {
+        denoise_strength: parseFloat(denoiseStrength.value),
+        final_denoise_strength: parseFloat(finalDenoiseStrength.value),
+        scale_factor: parseInt(scaleFactor.value),
+        quality: qualitySlider.value,
+        smooth_strength: parseFloat(smoothStrength.value),
+        sharpness: parseFloat(sharpnessSlider.value),
+        ai_enhance: aiEnhanceCheckbox.checked
+    };
+    
+    isProcessing = true;
+    loadingDiv.classList.remove('hidden');
+    optionsDiv.classList.add('hidden');
+    previewDiv.classList.add('hidden');
+    progressBar.style.width = '0%';
+    resetSteps();
+    
+    try {
+        updateStep('step1');
+        await updateProgress(5, 500);
+        const img = await loadImage(selectedFile);
+        await updateProgress(10, 300);
+        
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
         
-        // Ограничение размера для анализа
-        const maxAnalysisSize = 1000;
-        const ratio = Math.min(maxAnalysisSize / img.width, maxAnalysisSize / img.height);
-        canvas.width = Math.floor(img.width * ratio);
-        canvas.height = Math.floor(img.height * ratio);
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
         
+        if (params.denoise_strength > 0) {
+            updateStep('step2');
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            await applyBilateralFilter(imageData, params.denoise_strength, (progress) => {
+                progressBar.style.width = `${10 + progress * 10}%`;
+            });
+            ctx.putImageData(imageData, 0, 0);
+            await updateProgress(20, 300);
+        }
+        
+        updateStep('step3');
+        const scale = params.scale_factor;
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        await updateProgress(30, 800);
         
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imageData.data;
-        const grayValues = [];
-        
-        // Упрощенный анализ (каждый 10-й пиксель)
-        for (let i = 0; i < data.length; i += 40) {
-            const gray = 0.3 * data[i] + 0.59 * data[i+1] + 0.11 * data[i+2];
-            grayValues.push(gray / 255);
-        }
-
-        if (grayValues.length === 0) {
-            throw new Error('No pixels analyzed');
-        }
-
-        const mean = grayValues.reduce((a, b) => a + b, 0) / grayValues.length;
-        const std = Math.sqrt(grayValues.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / grayValues.length);
-        
-        const features = {
-            mean: mean,
-            std: std,
-            min: Math.min(...grayValues),
-            max: Math.max(...grayValues),
-            median: calculateMedian(grayValues),
-            percentile_25: calculatePercentile(grayValues, 0.25),
-            width: img.width,
-            height: img.height
-        };
-        
-        const params = {};
-        for (let i = 0; i < enhancementWeights.target_params.length; i++) {
-            const param = enhancementWeights.target_params[i];
-            const coef = enhancementWeights.models_coef[i];
-            const intercept = enhancementWeights.models_intercept[i];
-            
-            let prediction = intercept;
-            for (let j = 0; j < enhancementWeights.feature_names.length; j++) {
-                const feature = enhancementWeights.feature_names[j];
-                prediction += coef[j] * (features[feature] || 0);
-            }
-            
-            params[param] = Math.max(0, Math.min(prediction, 10));
+        if (params.smooth_strength > 0) {
+            updateStep('step4');
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            await applyFullSmoothing(imageData, params.smooth_strength, (progress) => {
+                progressBar.style.width = `${30 + progress * 15}%`;
+            });
+            ctx.putImageData(imageData, 0, 0);
+            await updateProgress(45, 300);
         }
         
-        params.scale_factor = Math.min(16, Math.round(params.scale_factor));
-        params.ai_enhance = params.ai_enhance > 0.5 ? 1 : 0;
+        if (params.ai_enhance) {
+            updateStep('step5');
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            await applyAIEnhancement(imageData, (progress) => {
+                progressBar.style.width = `${45 + progress * 15}%`;
+            });
+            ctx.putImageData(imageData, 0, 0);
+            await updateProgress(60, 500);
+        }
         
-        return params;
+        if (params.sharpness > 0) {
+            updateStep('step6');
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            await applySharpness(imageData, params.sharpness, (progress) => {
+                progressBar.style.width = `${60 + progress * 15}%`;
+            });
+            ctx.putImageData(imageData, 0, 0);
+            await updateProgress(75, 300);
+        }
+        
+        if (params.final_denoise_strength > 0) {
+            updateStep('step7');
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            await applyBilateralFilter(imageData, params.final_denoise_strength, (progress) => {
+                progressBar.style.width = `${75 + progress * 15}%`;
+            });
+            ctx.putImageData(imageData, 0, 0);
+            await updateProgress(90, 300);
+        }
+        
+        updateStep('step8');
+        await updateProgress(95, 500);
+        const quality = params.quality / 10;
+        resultImage.src = canvas.toDataURL('image/jpeg', quality);
+        await updateProgress(100, 300);
+        
+        loadingDiv.classList.add('hidden');
+        previewDiv.classList.remove('hidden');
+        resultInfo.textContent = `${canvas.width} × ${canvas.height}px | ${formatSize(selectedFile.size * scale * quality * 0.5)}`;
         
     } catch (error) {
-        console.error('Error in calculateEnhancementParams:', error);
-        return {
-            denoise_strength: 5,
-            final_denoise_strength: 3,
-            scale_factor: 4,
-            quality: 8,
-            smooth_strength: 5,
-            sharpness: 5,
-            ai_enhance: 1
-        };
+        console.error('Ошибка обработки:', error);
+        loadingDiv.classList.add('hidden');
+        alert('Произошла ошибка при обработке изображения');
+    } finally {
+        isProcessing = false;
     }
 }
 
-// Функции обработки изображений
 async function applyBilateralFilter(imageData, strength, progressCallback) {
     const data = imageData.data;
     const width = imageData.width;
@@ -261,7 +372,6 @@ async function applyFullSmoothing(imageData, strength, progressCallback) {
     const buffer1 = new Uint8ClampedArray(data);
     const buffer2 = new Uint8ClampedArray(data.length);
     
-    // 1. Анизотропное размытие
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
             const idx = (y * width + x) * 4;
@@ -316,7 +426,6 @@ async function applyFullSmoothing(imageData, strength, progressCallback) {
         }
     }
     
-    // 2. Билатеральная фильтрация
     const sigmaColor = 10 + strength * 2;
     for (let i = 0; i < data.length; i += 4) {
         const x = (i / 4) % width;
@@ -425,25 +534,6 @@ async function applySharpness(imageData, sharpness, progressCallback) {
     progressCallback(1);
 }
 
-function createGaussianKernel(radius) {
-    const sigma = radius / 2;
-    const kernelSize = radius * 2 + 1;
-    const kernel = new Array(kernelSize);
-    let sum = 0;
-    
-    for (let i = 0; i < kernelSize; i++) {
-        const x = i - radius;
-        kernel[i] = Math.exp(-(x * x) / (2 * sigma * sigma));
-        sum += kernel[i];
-    }
-    
-    for (let i = 0; i < kernelSize; i++) {
-        kernel[i] /= sum;
-    }
-    
-    return kernel;
-}
-
 function applyBlurPass(src, dst, width, height, kernel, horizontal) {
     const radius = (kernel.length - 1) / 2;
     
@@ -480,41 +570,29 @@ function applyBlurPass(src, dst, width, height, kernel, horizontal) {
     }
 }
 
-// Работа с интерфейсом
-function updateDenoiseLabel() {
-    updateLabel(denoiseStrength, denoiseValue, ['очень лёгкая', 'лёгкая', 'умеренная', 'сильная']);
-}
-
-function updateFinalDenoiseLabel() {
-    updateLabel(finalDenoiseStrength, finalDenoiseValue, ['очень лёгкая', 'лёгкая', 'умеренная', 'сильная']);
-}
-
-function updateQualityLabel() {
-    updateLabel(qualitySlider, qualityValue, ['низкое', 'среднее', 'хорошее', 'отличное']);
-}
-
-function updateSmoothLabel() {
-    updateLabel(smoothStrength, smoothValue, ['умное', 'адаптивное', 'сильное', 'ультра-плавное']);
-}
-
-function updateSharpnessLabel() {
-    updateLabel(sharpnessSlider, sharpnessValue, ['слабая', 'умеренная', 'сильная', 'экстремальная']);
-}
-
-function updateLabel(slider, valueElement, labels) {
-    const value = slider.value;
-    let text = `${value}/10 (`;
+function createGaussianKernel(radius) {
+    const sigma = radius / 2;
+    const kernelSize = radius * 2 + 1;
+    const kernel = new Array(kernelSize);
+    let sum = 0;
     
-    if (value < 3) text += labels[0];
-    else if (value < 6) text += labels[1];
-    else if (value < 8) text += labels[2];
-    else text += labels[3];
+    for (let i = 0; i < kernelSize; i++) {
+        const x = i - radius;
+        kernel[i] = Math.exp(-(x * x) / (2 * sigma * sigma));
+        sum += kernel[i];
+    }
     
-    text += ')';
-    valueElement.textContent = text;
+    for (let i = 0; i < kernelSize; i++) {
+        kernel[i] /= sum;
+    }
+    
+    return kernel;
 }
 
-// Обработка файлов
+function clamp(value) {
+    return Math.max(0, Math.min(255, value));
+}
+
 function loadImage(file) {
     return new Promise((resolve, reject) => {
         const img = new Image();
@@ -524,188 +602,6 @@ function loadImage(file) {
     });
 }
 
-function handleFiles(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    
-    if (!file.type.match('image.*')) {
-        alert('Пожалуйста, выберите изображение (JPG, PNG, WEBP)');
-        return;
-    }
-    
-    if (file.size > 10 * 1024 * 1024) {
-        alert('Файл слишком большой. Максимальный размер 10MB');
-        return;
-    }
-    
-    selectedFile = file;
-    optionsDiv.classList.remove('hidden');
-    
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        originalImage.src = e.target.result;
-        
-        const img = new Image();
-        img.onload = function() {
-            originalInfo.textContent = `${img.width} × ${img.height}px | ${formatSize(file.size)}`;
-        };
-        img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
-}
-
-function handleDrop(e) {
-    const dt = e.dataTransfer;
-    const files = dt.files;
-    handleFiles({ target: { files } });
-}
-
-// Основная функция обработки
-async function processImage() {
-    if (isProcessing || !selectedFile) return;
-    isProcessing = true;
-    
-    if (!enhancementWeights) {
-        await loadWeights();
-    }
-    
-    loadingDiv.classList.remove('hidden');
-    optionsDiv.classList.add('hidden');
-    previewDiv.classList.add('hidden');
-    progressBar.style.width = '0%';
-    resetSteps();
-    
-    try {
-        updateStep('step1');
-        await updateProgress(5, 500);
-        
-        // Проверка размера изображения
-        const img = await loadImage(selectedFile);
-        if (img.width * img.height > 5000 * 5000) {
-            throw new Error('Изображение слишком большое. Максимальный размер 5000x5000 пикселей');
-        }
-        
-        await updateProgress(10, 300);
-        
-        // Автоматический расчет параметров
-        const params = await calculateEnhancementParams(img);
-        
-        // Установка параметров
-        denoiseStrength.value = params.denoise_strength;
-        finalDenoiseStrength.value = params.final_denoise_strength;
-        scaleFactor.value = params.scale_factor;
-        qualitySlider.value = params.quality;
-        smoothStrength.value = params.smooth_strength;
-        sharpnessSlider.value = params.sharpness;
-        aiEnhanceCheckbox.checked = params.ai_enhance > 0.5;
-        
-        updateDenoiseLabel();
-        updateFinalDenoiseLabel();
-        updateQualityLabel();
-        updateSmoothLabel();
-        updateSharpnessLabel();
-        
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        
-        // Обработка изображения
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx.drawImage(img, 0, 0);
-        
-        // Первичное шумоподавление
-        if (params.denoise_strength > 0) {
-            updateStep('step2');
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            await applyBilateralFilter(imageData, params.denoise_strength, (progress) => {
-                progressBar.style.width = `${10 + progress * 10}%`;
-            });
-            ctx.putImageData(imageData, 0, 0);
-            await updateProgress(20, 300);
-        }
-        
-        // Масштабирование
-        updateStep('step3');
-        const scale = parseInt(params.scale_factor);
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        await updateProgress(30, 800);
-        
-        // Сглаживание
-        if (params.smooth_strength > 0) {
-            updateStep('step4');
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            await applyFullSmoothing(imageData, params.smooth_strength, (progress) => {
-                progressBar.style.width = `${30 + progress * 15}%`;
-            });
-            ctx.putImageData(imageData, 0, 0);
-            await updateProgress(45, 300);
-        }
-        
-        // Улучшение ИИ
-        if (params.ai_enhance) {
-            updateStep('step5');
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            await applyAIEnhancement(imageData, (progress) => {
-                progressBar.style.width = `${45 + progress * 15}%`;
-            });
-            ctx.putImageData(imageData, 0, 0);
-            await updateProgress(60, 500);
-        }
-        
-        // Увеличение резкости
-        if (params.sharpness > 0) {
-            updateStep('step6');
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            await applySharpness(imageData, params.sharpness, (progress) => {
-                progressBar.style.width = `${60 + progress * 15}%`;
-            });
-            ctx.putImageData(imageData, 0, 0);
-            await updateProgress(75, 300);
-        }
-        
-        // Финальное шумоподавление
-        if (params.final_denoise_strength > 0) {
-            updateStep('step7');
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            await applyBilateralFilter(imageData, params.final_denoise_strength, (progress) => {
-                progressBar.style.width = `${75 + progress * 15}%`;
-            });
-            ctx.putImageData(imageData, 0, 0);
-            await updateProgress(90, 300);
-        }
-        
-        // Сохранение результата
-        updateStep('step8');
-        await updateProgress(95, 500);
-        const quality = params.quality / 10;
-        resultImage.src = canvas.toDataURL('image/jpeg', quality);
-        await updateProgress(100, 300);
-        
-        // Показ результата
-        loadingDiv.classList.add('hidden');
-        previewDiv.classList.remove('hidden');
-        resultInfo.textContent = `${canvas.width} × ${canvas.height}px | ${formatSize(selectedFile.size * scale * quality * 0.5)}`;
-        
-    } catch (error) {
-        console.error('Ошибка обработки:', error);
-        loadingDiv.classList.add('hidden');
-        
-        const errorMsg = `Ошибка: ${error.message}\n\n` +
-                        `1. Попробуйте другое изображение\n` +
-                        `2. Уменьшите размер файла\n` +
-                        `3. Проверьте формат (JPG/PNG/WEBP)`;
-        
-        alert(errorMsg);
-    } finally {
-        isProcessing = false;
-    }
-}
-
-// Вспомогательные функции UI
 function preventDefaults(e) {
     e.preventDefault();
     e.stopPropagation();
@@ -743,7 +639,7 @@ function downloadResult() {
     
     const link = document.createElement('a');
     link.href = resultImage.src;
-    link.download = `enhanced_${selectedFile.name.replace(/\.[^/.]+$/, '')}.jpg`;
+    link.download = `enhanced_${selectedFile.name}`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -755,48 +651,4 @@ function formatSize(bytes) {
     return (bytes / (1024 * 1024)).toFixed(1) + ' МБ';
 }
 
-// Инициализация
-async function init() {
-    await loadWeights();
-    
-    // Настройка обработчиков событий
-    denoiseStrength.addEventListener('input', updateDenoiseLabel);
-    finalDenoiseStrength.addEventListener('input', updateFinalDenoiseLabel);
-    qualitySlider.addEventListener('input', updateQualityLabel);
-    smoothStrength.addEventListener('input', updateSmoothLabel);
-    sharpnessSlider.addEventListener('input', updateSharpnessLabel);
-    
-    updateDenoiseLabel();
-    updateFinalDenoiseLabel();
-    updateQualityLabel();
-    updateSmoothLabel();
-    updateSharpnessLabel();
-    
-    selectFilesBtn.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', handleFiles);
-    
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        dropArea.addEventListener(eventName, preventDefaults, false);
-        document.body.addEventListener(eventName, preventDefaults, false);
-    });
-    
-    ['dragenter', 'dragover'].forEach(eventName => {
-        dropArea.addEventListener(eventName, highlight, false);
-    });
-    
-    ['dragleave', 'drop'].forEach(eventName => {
-        dropArea.addEventListener(eventName, unhighlight, false);
-    });
-    
-    dropArea.addEventListener('drop', handleDrop, false);
-    processBtn.addEventListener('click', processImage);
-    downloadBtn.addEventListener('click', downloadResult);
-    
-    // Глобальная обработка ошибок
-    window.onerror = function(message, source, lineno, colno, error) {
-        console.error('Global error:', { message, source, lineno, colno, error });
-    };
-}
-
-// Запуск приложения
 document.addEventListener('DOMContentLoaded', init);
