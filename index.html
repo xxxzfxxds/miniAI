@@ -18,6 +18,12 @@
                 <p>Поддерживаются: JPG, PNG, WEBP (макс. 10MB)</p>
             </div>
             <input type="file" id="fileInput" accept="image/*" style="display: none;">
+            
+            <div class="weights-upload">
+                <button id="loadWeights" class="btn">Загрузить веса (JSON)</button>
+                <input type="file" id="weightsInput" accept=".json" style="display: none;">
+                <p id="weightsInfo">Веса не загружены</p>
+            </div>
         </div>
 
         <div id="options" class="options hidden">
