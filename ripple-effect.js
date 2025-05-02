@@ -111,6 +111,4 @@ class RippleEffect {
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    new RippleEffect();
-});
+new RippleEffect();
