@@ -65,6 +65,21 @@ h1 {
     color: #ffb6c1;
 }
 
+.weights-upload {
+    margin-top: 20px;
+    padding: 15px;
+    background: rgba(255, 105, 180, 0.05);
+    border-radius: 8px;
+    border: 1px dashed #ff69b4;
+    text-align: center;
+}
+
+#weightsInfo {
+    margin-top: 10px;
+    font-size: 14px;
+    color: #ffb6c1;
+}
+
 .btn {
     background: linear-gradient(135deg, #ff69b4, #ff1493);
     color: white;
@@ -78,10 +93,18 @@ h1 {
     box-shadow: 0 4px 15px rgba(255, 105, 180, 0.3);
 }
 
+#loadWeights {
+    background: linear-gradient(135deg, #9c27b0, #673ab7);
+}
+
 .btn:hover {
     background: linear-gradient(135deg, #ff1493, #ff69b4);
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(255, 105, 180, 0.4);
+}
+
+#loadWeights:hover {
+    background: linear-gradient(135deg, #673ab7, #9c27b0);
 }
 
 .btn:active {
